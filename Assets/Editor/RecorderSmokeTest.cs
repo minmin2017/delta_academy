@@ -17,6 +17,46 @@ public static class RecorderSmokeTest
     public static string LastOutputPath;
     public static bool IsDone => s_Controller == null || !s_Controller.IsRecording();
 
+    // ===================================================================================
+    // GIZMO SUPPRESSION - discovered live via ffmpeg frame extraction that Recorder's
+    // GameViewInputSettings captures whatever the Game View's "Gizmos" toggle is currently
+    // set to, baking giant TextMeshPro/Camera/ReflectionProbe editor icons permanently into
+    // the output video. Unity does not expose this toggle publicly - reflection into the
+    // internal GameView EditorWindow type is required. Call ForceGizmosOff() before every
+    // recording start.
+    // ===================================================================================
+    private static bool? s_SavedGizmoState;
+
+    private static System.Type GameViewType => System.Type.GetType("UnityEditor.GameView,UnityEditor");
+
+    public static void ForceGizmosOff()
+    {
+        var gameViewType = GameViewType;
+        if (gameViewType == null) { Debug.LogWarning("[RecorderGizmoFix] Could not find internal GameView type via reflection."); return; }
+        var window = EditorWindow.GetWindow(gameViewType, false, null, false);
+        var prop = gameViewType.GetProperty("showGizmos", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        if (prop == null) { Debug.LogWarning("[RecorderGizmoFix] Could not find 'gizmos' property on GameView via reflection."); return; }
+        s_SavedGizmoState = (bool)prop.GetValue(window);
+        prop.SetValue(window, false);
+        window.Repaint();
+        Debug.Log("[RecorderGizmoFix] Game View gizmos forced OFF (was " + s_SavedGizmoState + ") before recording.");
+    }
+
+    public static void RestoreGizmoState()
+    {
+        if (s_SavedGizmoState == null) return;
+        var gameViewType = GameViewType;
+        if (gameViewType == null) return;
+        var window = EditorWindow.GetWindow(gameViewType, false, null, false);
+        var prop = gameViewType.GetProperty("showGizmos", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+        if (prop != null)
+        {
+            prop.SetValue(window, s_SavedGizmoState.Value);
+            window.Repaint();
+        }
+        s_SavedGizmoState = null;
+    }
+
     [MenuItem("Tools/Delta/Recorder Smoke Test (Small, 2s)")]
     public static void RunSmokeTest()
     {
@@ -75,6 +115,7 @@ public static class RecorderSmokeTest
 
         controllerSettings.AddRecorderSettings(movieSettings);
 
+        ForceGizmosOff();
         s_Controller = new RecorderController(controllerSettings);
         s_Controller.PrepareRecording();
         s_Controller.StartRecording();
@@ -157,6 +198,7 @@ public static class RecorderSmokeTest
 
         controllerSettings.AddRecorderSettings(movieSettings);
 
+        ForceGizmosOff();
         s_Controller = new RecorderController(controllerSettings);
         s_Controller.PrepareRecording();
         s_Controller.StartRecording();
@@ -245,6 +287,7 @@ public static class RecorderSmokeTest
         LastOutputPath = movieSettings.OutputFile + ".mp4";
 
         controllerSettings.AddRecorderSettings(movieSettings);
+        ForceGizmosOff();
         s_Controller = new RecorderController(controllerSettings);
         s_Controller.PrepareRecording();
         s_Controller.StartRecording();
