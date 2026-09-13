@@ -78,9 +78,6 @@ public static class DeltaControlPropsBuilder
         screenBlue.EnableKeyword("_EMISSION");
         screenBlue.SetColor("_EmissionColor", new Color(0.05f, 0.25f, 0.60f) * 1.5f);
 
-        Shader urpUnlit = Shader.Find("Universal Render Pipeline/Unlit");
-        Material backingPlateMat = DeltaMaterials.PaintedSteel(new Color(0.10f, 0.11f, 0.12f, 1f));
-
         TMP_FontAsset fontAsset = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
         if (fontAsset == null)
         {
@@ -212,11 +209,6 @@ public static class DeltaControlPropsBuilder
             "<b>CliQ-M</b>\n<color=#AACCFF>24 VDC</color>",
             0.034f, Color.white, TextAlignmentOptions.Center, new Vector2(0.10f, 0.05f), fontAsset);
 
-        CreateReferenceCard(cabinetObj.transform, "RefCard_CliQ_M",
-            "Assets/ReferenceImages/CliQ-M_front.jpg",
-            new Vector3(-0.30f, 0.48f, -0.05f), new Vector2(0.060f, 0.025f),
-            backingPlateMat, urpUnlit);
-
         // 2. AS320T-B PLC: 0.088 W x 0.088 H x 0.095 D m
         GameObject plc = GameObject.CreatePrimitive(PrimitiveType.Cube);
         plc.name = "Delta_AS320T_B_PLC";
@@ -261,11 +253,6 @@ public static class DeltaControlPropsBuilder
             "<b>AS320T-B</b>\n<color=#AACCFF>PLC</color>",
             0.034f, Color.white, TextAlignmentOptions.Center, new Vector2(0.12f, 0.05f), fontAsset);
 
-        CreateReferenceCard(cabinetObj.transform, "RefCard_AS320T",
-            "Assets/ReferenceImages/AS320T-B_front.jpg",
-            new Vector3(-0.16f, 0.48f, -0.06f), new Vector2(0.045f, 0.043f),
-            backingPlateMat, urpUnlit);
-
         // 3. ASD-A3 AC Servo Drive X (GUIDE RAIL): 0.040 W x 0.150 H x 0.163 D m
         GameObject servoX = GameObject.CreatePrimitive(PrimitiveType.Cube);
         servoX.name = "Delta_ASD_A3_X_Rail";
@@ -290,11 +277,6 @@ public static class DeltaControlPropsBuilder
             "<b>ASD-A3</b>\n<color=#00FF66>X — RAIL</color>",
             0.030f, Color.white, TextAlignmentOptions.Center, new Vector2(0.12f, 0.05f), fontAsset);
 
-        CreateReferenceCard(cabinetObj.transform, "RefCard_ServoX",
-            "Assets/ReferenceImages/ASD-A3_front.jpg",
-            new Vector3(-0.02f, 0.50f, -0.01f), new Vector2(0.055f, 0.035f),
-            backingPlateMat, urpUnlit);
-
         // 4. ASD-A3 AC Servo Drive Z (NOZZLE): 0.040 W x 0.150 H x 0.163 D m
         GameObject servoZ = GameObject.CreatePrimitive(PrimitiveType.Cube);
         servoZ.name = "Delta_ASD_A3_Z_Nozzle";
@@ -318,11 +300,6 @@ public static class DeltaControlPropsBuilder
             new Vector3(0.08f, 0.43f, -0.01f), Vector3.zero,
             "<b>ASD-A3</b>\n<color=#00FF66>Z — NOZZLE</color>",
             0.030f, Color.white, TextAlignmentOptions.Center, new Vector2(0.14f, 0.05f), fontAsset);
-
-        CreateReferenceCard(cabinetObj.transform, "RefCard_ServoZ",
-            "Assets/ReferenceImages/ASD-A3_front.jpg",
-            new Vector3(0.08f, 0.50f, -0.01f), new Vector2(0.055f, 0.035f),
-            backingPlateMat, urpUnlit);
 
         // =========================================================================
         // ROW 2: VFD BELOW (MOUNTED DIRECTLY UNDER PLC ON LOWER DIN RAIL)
@@ -360,11 +337,6 @@ public static class DeltaControlPropsBuilder
             new Vector3(-0.16f, 0.04f, -0.05f), Vector3.zero,
             "<b>MS300</b>\n<color=#FFCC00>CONVEYOR</color>",
             0.032f, Color.white, TextAlignmentOptions.Center, new Vector2(0.12f, 0.05f), fontAsset);
-
-        CreateReferenceCard(cabinetObj.transform, "RefCard_MS300",
-            "Assets/ReferenceImages/MS300_front.jpg",
-            new Vector3(-0.16f, 0.10f, -0.05f), new Vector2(0.055f, 0.035f),
-            backingPlateMat, urpUnlit);
 
         // Lower Terminal Blocks along Row 2
         GameObject termStrip = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -425,12 +397,6 @@ public static class DeltaControlPropsBuilder
             new Vector3(0f, -0.42f, 0.52f), Vector3.zero,
             "<size=120%><b><color=#00D8FF>DELTA</color></b></size>  DOP-100WS",
             0.022f, Color.white, TextAlignmentOptions.Center, new Vector2(0.13f, 0.025f), fontAsset);
-
-        // Reference photo card mounted on door panel next to HMI
-        CreateReferenceCard(doorHinge.transform, "RefCard_DOP100WS",
-            "Assets/ReferenceImages/DOP-100WS_front.jpg",
-            new Vector3(0.55f, 0.30f, 0.020f), new Vector2(0.045f, 0.031f),
-            backingPlateMat, urpUnlit);
 
         // Runtime HMI Display TextMeshPro
         GameObject hmiTextObj = new GameObject("HMI_Display_TextMeshPro");
@@ -567,93 +533,5 @@ public static class DeltaControlPropsBuilder
         }
 
         return tmp;
-    }
-
-    private static GameObject CreateReferenceCard(Transform parent, string cardName, string textureAssetPath,
-        Vector3 localPos, Vector2 size, Material backingMat, Shader unlitShader)
-    {
-        Texture2D tex = LoadReferenceTexture(textureAssetPath);
-        if (tex == null)
-        {
-            Debug.LogWarning($"[DeltaControlPropsBuilder] Reference texture at '{textureAssetPath}' could not be loaded!");
-            return null;
-        }
-
-        GameObject cardRoot = new GameObject(cardName);
-        cardRoot.transform.SetParent(parent);
-        cardRoot.transform.localPosition = localPos;
-        cardRoot.transform.localRotation = Quaternion.identity;
-
-        // 1. Dark backing plate (slightly larger by 4mm border)
-        GameObject backing = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        backing.name = "BackingPlate";
-        backing.transform.SetParent(cardRoot.transform);
-        backing.transform.localPosition = new Vector3(0f, 0f, -0.0005f);
-        backing.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-        backing.transform.localScale = new Vector3(size.x + 0.004f, size.y + 0.004f, 1f);
-        Renderer backRend = backing.GetComponent<Renderer>();
-        backRend.sharedMaterial = backingMat;
-        backRend.shadowCastingMode = ShadowCastingMode.Off;
-        backRend.receiveShadows = false;
-        Collider backCol = backing.GetComponent<Collider>();
-        if (backCol != null) Object.DestroyImmediate(backCol);
-
-        // 2. Front photo card quad
-        GameObject photoQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        photoQuad.name = "PhotoQuad";
-        photoQuad.transform.SetParent(cardRoot.transform);
-        photoQuad.transform.localPosition = Vector3.zero;
-        photoQuad.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
-        photoQuad.transform.localScale = new Vector3(size.x, size.y, 1f);
-
-        Material unlitMat = new Material(unlitShader)
-        {
-            name = $"M_Ref_{cardName}"
-        };
-        unlitMat.SetTexture("_BaseMap", tex);
-        if (unlitMat.HasProperty("_MainTex"))
-        {
-            unlitMat.SetTexture("_MainTex", tex);
-        }
-        unlitMat.SetColor("_BaseColor", Color.white);
-        unlitMat.SetFloat("_Cull", (float)CullMode.Off);
-
-        Renderer photoRend = photoQuad.GetComponent<Renderer>();
-        photoRend.sharedMaterial = unlitMat;
-        photoRend.shadowCastingMode = ShadowCastingMode.Off;
-        photoRend.receiveShadows = false;
-        Collider photoCol = photoQuad.GetComponent<Collider>();
-        if (photoCol != null) Object.DestroyImmediate(photoCol);
-
-        return cardRoot;
-    }
-
-    private static Texture2D LoadReferenceTexture(string assetPath)
-    {
-        TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-        if (importer != null)
-        {
-            bool dirty = false;
-            if (importer.textureCompression != TextureImporterCompression.Uncompressed)
-            {
-                importer.textureCompression = TextureImporterCompression.Uncompressed;
-                dirty = true;
-            }
-            if (importer.npotScale != TextureImporterNPOTScale.None)
-            {
-                importer.npotScale = TextureImporterNPOTScale.None;
-                dirty = true;
-            }
-            if (importer.maxTextureSize < 2048)
-            {
-                importer.maxTextureSize = 2048;
-                dirty = true;
-            }
-            if (dirty)
-            {
-                importer.SaveAndReimport();
-            }
-        }
-        return AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
     }
 }
