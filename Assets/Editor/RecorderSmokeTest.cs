@@ -272,6 +272,7 @@ public static class RecorderSmokeTest
             c.enabled = false;
         }
         travelCam.enabled = true;
+        travelCamObj.tag = "MainCamera"; // CameraInputSettings.ImageSource.MainCamera needs this - see B-draft render comment for why GameViewInputSettings was dropped (bakes gizmo icons into output)
         if (travelScript != null) travelScript.Replay();
 
         float durationSeconds = (travelScript != null) ? travelScript.duration + 0.5f : 10.5f;
@@ -292,7 +293,7 @@ public static class RecorderSmokeTest
         movieSettings.VideoBitRateMode = UnityEditor.VideoBitrateMode.High;
 #pragma warning restore CS0618
 
-        movieSettings.ImageInputSettings = new GameViewInputSettings { OutputWidth = 1280, OutputHeight = 720 };
+        movieSettings.ImageInputSettings = new CameraInputSettings { Source = ImageSource.MainCamera, OutputWidth = 1280, OutputHeight = 720 };
         movieSettings.CaptureAudio = false;
 
         string projectRoot = Path.GetDirectoryName(Application.dataPath);
