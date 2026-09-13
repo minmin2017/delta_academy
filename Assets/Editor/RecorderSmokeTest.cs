@@ -393,11 +393,14 @@ public static class RecorderSmokeTest
         movieSettings.VideoBitRateMode = UnityEditor.VideoBitrateMode.High;
 #pragma warning restore CS0618
 
+        // OutputWidth/OutputHeight are NOT set here deliberately - RenderTextureInputSettings'
+        // setters for those forward directly to renderTexture.width/.height, which Unity does
+        // not allow on an already-.Create()'d RenderTexture ("Setting width of already created
+        // render texture is not supported!"). The getters already report s_SharedRT's own
+        // dimensions (1280x720, set at creation above), so this is a no-op worth skipping.
         movieSettings.ImageInputSettings = new RenderTextureInputSettings
         {
-            RenderTexture = s_SharedRT,
-            OutputWidth = width,
-            OutputHeight = height
+            RenderTexture = s_SharedRT
         };
         movieSettings.CaptureAudio = false;
 
