@@ -55,8 +55,10 @@ public static class TravelingCameraBuilder
         // - Downstream EndOfLine Outfeed: Z = +2.70m (belt end at Z = +3.90m). End at Z = +4.50m for full exit sweep.
         // - Operator aisle offset: X = +2.20m (clear view of conveyor and cabinet/tanks on opposite side).
         // - Elevation: Y = 1.80m (elevated 3/4 angle above 0.90m conveyor belt).
-        Vector3 startPos = new Vector3(2.20f, 1.80f, -4.80f);
-        Vector3 endPos = new Vector3(2.20f, 1.80f, 4.50f);
+        // Pulled back and raised from the original (2.20,1.80,-4.80) start - live-verified via
+        // unityMCP that the original framing cropped the top of DeltaControlCabinet/ProductTank.
+        Vector3 startPos = new Vector3(3.00f, 2.60f, -6.50f);
+        Vector3 endPos = new Vector3(3.00f, 2.60f, 6.20f);
         Vector3 lookOffset = new Vector3(0.0f, 0.90f, 2.50f);
         float duration = 10.0f;
 
