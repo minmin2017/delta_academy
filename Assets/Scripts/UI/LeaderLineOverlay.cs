@@ -537,7 +537,7 @@ public class LeaderLineOverlay : MonoBehaviour
         if (labelTextComponent != null)
         {
             labelTextComponent.raycastTarget = false;
-            labelTextComponent.enableWordWrapping = false;
+            labelTextComponent.textWrappingMode = TextWrappingModes.NoWrap;
             labelTextComponent.overflowMode = TextOverflowModes.Overflow;
             labelTextComponent.text = text;
             labelTextComponent.fontSize = fontSize;
