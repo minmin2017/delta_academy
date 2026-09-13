@@ -106,6 +106,49 @@ public class ChangeoverSequencer : MonoBehaviour
     public string CurrentStateName => currentState.ToString();
     public float StateProgress => (stateDuration > 0f) ? Mathf.Clamp01(stateTimer / stateDuration) : 1f;
 
+    [Header("Telemetry (Live Read-Only in Millimetres)")]
+    /// <summary>
+    /// Current live guide rail opening gap in millimetres, computed from GuideRailAssembly_X children transforms.
+    /// </summary>
+    public float CurrentRailGapMm
+    {
+        get
+        {
+            if (railLeft != null && railRight != null)
+            {
+                return Mathf.Abs(railRight.localPosition.x - railLeft.localPosition.x) * 1000f;
+            }
+            if (guideRailAssembly != null)
+            {
+                Transform l = guideRailAssembly.Find("GuideRail_Left_30mm");
+                Transform r = guideRailAssembly.Find("GuideRail_Right_30mm");
+                if (l != null && r != null)
+                {
+                    return Mathf.Abs(r.localPosition.x - l.localPosition.x) * 1000f;
+                }
+            }
+            return currentRecipe.railGap * 1000f;
+        }
+    }
+
+    /// <summary>
+    /// Current live nozzle height in millimetres, computed from NozzleAssembly_Z world transform position Y.
+    /// </summary>
+    public float CurrentNozzleHeightMm
+    {
+        get
+        {
+            if (nozzleAssembly != null)
+            {
+                return nozzleAssembly.position.y * 1000f;
+            }
+            return (BeltSurfaceY + currentRecipe.nozzleClearHeight) * 1000f;
+        }
+    }
+
+    public float LiveRailGapMm => CurrentRailGapMm;
+    public float LiveNozzleHeightMm => CurrentNozzleHeightMm;
+
     [Header("Scene References (Assigned by Attach Sequencer)")]
     public Transform guideRailAssembly;
     public Transform nozzleAssembly;

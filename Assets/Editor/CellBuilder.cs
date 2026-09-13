@@ -536,6 +536,42 @@ public static class CellBuilder
         UniversalAdditionalCameraData wideCamData = wideCamObj.AddComponent<UniversalAdditionalCameraData>();
         wideCamData.renderPostProcessing = true;
 
+        // Rail Top Camera (Overhead angle framing GuideRailAssembly_X, depth 90, initially disabled)
+        GameObject railTopCamObj = new GameObject("RailTopCam");
+        railTopCamObj.transform.SetParent(root.transform);
+        railTopCamObj.transform.position = new Vector3(0.0f, 2.35f, -0.15f);
+        railTopCamObj.transform.LookAt(new Vector3(0f, 0.96f, 0.15f));
+
+        Camera railTopCam = railTopCamObj.AddComponent<Camera>();
+        railTopCam.fieldOfView = 48f;
+        railTopCam.nearClipPlane = 0.05f;
+        railTopCam.farClipPlane = 50f;
+        railTopCam.depth = 90f;
+        railTopCam.clearFlags = CameraClearFlags.SolidColor;
+        railTopCam.backgroundColor = charcoalBg;
+        railTopCam.enabled = false;
+
+        UniversalAdditionalCameraData railTopCamData = railTopCamObj.AddComponent<UniversalAdditionalCameraData>();
+        railTopCamData.renderPostProcessing = true;
+
+        // Nozzle Side Camera (Side angle framing NozzleAssembly_Z & fill station, depth 91, initially disabled)
+        GameObject nozzleSideCamObj = new GameObject("NozzleSideCam");
+        nozzleSideCamObj.transform.SetParent(root.transform);
+        nozzleSideCamObj.transform.position = new Vector3(1.10f, 1.25f, 0.55f);
+        nozzleSideCamObj.transform.LookAt(new Vector3(0f, 1.18f, 0.60f));
+
+        Camera nozzleSideCam = nozzleSideCamObj.AddComponent<Camera>();
+        nozzleSideCam.fieldOfView = 36f;
+        nozzleSideCam.nearClipPlane = 0.05f;
+        nozzleSideCam.farClipPlane = 50f;
+        nozzleSideCam.depth = 91f;
+        nozzleSideCam.clearFlags = CameraClearFlags.SolidColor;
+        nozzleSideCam.backgroundColor = charcoalBg;
+        nozzleSideCam.enabled = false;
+
+        UniversalAdditionalCameraData nozzleSideCamData = nozzleSideCamObj.AddComponent<UniversalAdditionalCameraData>();
+        nozzleSideCamData.renderPostProcessing = true;
+
         // =========================================================================
         // 11. REFLECTION PROBE (LAST CALL after ceiling fixtures, walls, ceiling & lights)
         // Scaled to cover the 20x20x9m room and full conveyor
