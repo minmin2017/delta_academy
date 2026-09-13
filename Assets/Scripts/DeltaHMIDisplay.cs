@@ -116,11 +116,11 @@ public class DeltaHMIDisplay : MonoBehaviour
     {
         if (completed)
         {
-            sb.Append(" <color=#00FF66>[✓] ").Append(label).Append("</color>\n");
+            sb.Append(" <color=#00FF66>[X] ").Append(label).Append("</color>\n");
         }
         else if (inProgress)
         {
-            sb.Append(" <color=#FFCC00>[▶] ").Append(label).Append("...</color>\n");
+            sb.Append(" <color=#FFCC00>[>] ").Append(label).Append("...</color>\n");
         }
         else
         {

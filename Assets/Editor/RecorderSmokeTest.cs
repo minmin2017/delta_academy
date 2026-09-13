@@ -181,8 +181,25 @@ public static class RecorderSmokeTest
         movieSettings.VideoBitRateMode = UnityEditor.VideoBitrateMode.High;
 #pragma warning restore CS0618
 
-        var imageInput = new GameViewInputSettings
+        // Switched from GameViewInputSettings to CameraInputSettings: GameView mirrors the
+        // interactive Editor view, which bakes gizmo icons (giant TMP/Camera/ReflectionProbe
+        // glyphs) permanently into the output - confirmed live via ffmpeg frame extraction,
+        // and the GameView.showGizmos reflection toggle did not actually suppress them.
+        // CameraInputSettings renders directly from a camera's own output with no gizmo
+        // overlay. Trade-off: URP does not support CaptureUI on this input type, so the
+        // Screen-Space Canvas overlay (LeaderLineOverlay/TelemetryOverlayController) will
+        // NOT appear in this render - consistent with this project's own established decision
+        // that overlays belong in 2D post-production compositing, not baked into the 3D render.
+        // Scope note: TaggedCamera picks the first matching camera via FindGameObjectsWithTag
+        // and does NOT follow CameraDirector's live enable/disable switching between shots, so
+        // this draft renders CellCam_Hero only for its full duration (no automatic cutaways to
+        // RailTopCam/NozzleSideCam) - a real per-frame camera-driven render is a follow-up task.
+        GameObject heroCamObj = GameObject.Find("CellCam_Hero");
+        if (heroCamObj != null) heroCamObj.tag = "MainCamera";
+
+        var imageInput = new CameraInputSettings
         {
+            Source = ImageSource.MainCamera,
             OutputWidth = 1280,
             OutputHeight = 720
         };
@@ -198,7 +215,6 @@ public static class RecorderSmokeTest
 
         controllerSettings.AddRecorderSettings(movieSettings);
 
-        ForceGizmosOff();
         s_Controller = new RecorderController(controllerSettings);
         s_Controller.PrepareRecording();
         s_Controller.StartRecording();
