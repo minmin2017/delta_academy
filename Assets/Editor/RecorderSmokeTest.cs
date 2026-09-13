@@ -473,6 +473,18 @@ public static class RecorderSmokeTest
             return;
         }
 
+        // Real bug found via frame extraction (t=55s/68s both showed ControlCam_Close when
+        // EndOfLineCam's 48-60s window should have been active): CameraDirector (B_Changeover's
+        // state-driven switcher) and TimedShotSwitcher (A's time-driven switcher) coexist on
+        // the same Cell GameObject and both fight over ControlCam_Close's enabled state.
+        // ChangeoverSequencer keeps looping/running regardless of which clip is being
+        // rendered, so whenever its own cycle reaches S1/S8, CameraDirector.LateUpdate()
+        // force-re-enables ControlCam_Close every frame from that point on, permanently
+        // overriding TimedShotSwitcher since LateUpdate runs after Update. Disable
+        // CameraDirector's switching for the duration of this A-clip render.
+        s_Director = UnityEngine.Object.FindAnyObjectByType<CameraDirector>();
+        if (s_Director != null) s_Director.autoSwitchOnState = false;
+
         const int width = 1280;
         const int height = 720;
         s_SharedRT = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
@@ -523,6 +535,10 @@ public static class RecorderSmokeTest
         if (s_ShotSwitcher != null)
         {
             s_ShotSwitcher.SetSharedRenderTexture(null);
+        }
+        if (s_Director != null)
+        {
+            s_Director.autoSwitchOnState = true; // restore B_Changeover's own switching
         }
         if (s_SharedRT != null)
         {
