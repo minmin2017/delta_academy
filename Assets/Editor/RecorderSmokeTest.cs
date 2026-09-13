@@ -368,6 +368,20 @@ public static class RecorderSmokeTest
             return;
         }
 
+        // Symmetric counterpart to the fix in StartZoneRecordingNow: TimedShotSwitcher (A-clip's
+        // time-driven switcher) has autoPlayOnStart = true, so once it exists in the scene it
+        // starts switching cameras the moment Play Mode is entered - fighting CameraDirector
+        // for this B-clip render exactly the way CameraDirector fought it for the A-clip render.
+        // The earlier B multicam render predates TimedShotSwitcher existing, which is why it
+        // wasn't hit at the time. Pause the switcher for the duration of this render.
+        s_ShotSwitcher = UnityEngine.Object.FindAnyObjectByType<TimedShotSwitcher>();
+        if (s_ShotSwitcher != null)
+        {
+            s_ShotSwitcher.autoPlayOnStart = false;
+            s_ShotSwitcher.Pause();
+        }
+        if (s_Director != null) s_Director.autoSwitchOnState = true; // ensure B's own switcher is live
+
         const int width = 1280;
         const int height = 720;
         s_SharedRT = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
@@ -425,6 +439,10 @@ public static class RecorderSmokeTest
         if (s_Director != null)
         {
             s_Director.SetSharedRenderTexture(null);
+        }
+        if (s_ShotSwitcher != null)
+        {
+            s_ShotSwitcher.autoPlayOnStart = true; // restore A-clip switcher's own behaviour
         }
         if (s_SharedRT != null)
         {
