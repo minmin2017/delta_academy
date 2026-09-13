@@ -80,15 +80,20 @@ public static class AClipZoneCamerasBuilder
 
         // =========================================================================
         // 3. CAPPING ZONE CAMERA (CappingZoneCam)
-        // Focused three-quarter profile framing Cap Feeder Hopper & Chute (Z = 1.05m),
-        // Cap Present Sensor (Z = 1.18m), and Capping Head Actuator & Chuck (Z = 1.30m).
-        // Target center: (0.00, 1.25, 1.18).
-        // Camera pos: (1.40, 1.45, 0.65), looking downstream-inwards at ~8° pitch.
+        // Repositioned live via unityMCP after the original side-on angle (1.40,1.45,0.65)
+        // was found to put DeltaControlCabinet directly in the sightline - the cabinet's
+        // world bounds extend to Z=1.33, physically overlapping the capping zone's own
+        // Z=1.05-1.30 range, so any across-the-line viewing angle competed with it for
+        // screen space. An elevated near-overhead 3/4 angle (steep downward pitch) looks
+        // mostly DOWN rather than ACROSS, visually separating the two by floor-plane depth
+        // instead of trying to out-frame the cabinet - verified clean via screenshot.
+        // Target center: (0.00, 1.00, 1.15).
+        // Camera pos: (0.90, 2.30, 1.15), steep downward pitch, elevated overhead angle.
         // =========================================================================
         CreateOrReplaceCamera(root, CappingCamName,
-            new Vector3(1.40f, 1.45f, 0.65f),
-            new Vector3(0.00f, 1.25f, 1.18f),
-            fieldOfView: 36f,
+            new Vector3(0.90f, 2.30f, 1.15f),
+            new Vector3(0.00f, 1.00f, 1.15f),
+            fieldOfView: 40f,
             depth: 82f,
             charcoalBg);
 
