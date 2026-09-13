@@ -89,7 +89,7 @@ public class DeltaHMIDisplay : MonoBehaviour
         sb.AppendLine("<color=#335577>────────────────────────────────────</color>");
         sb.AppendLine("<b><color=#A0B8D0>SAFE CHANGEOVER CHECKLIST:</color></b>");
 
-        // 7 Checklist Items
+        // Checklist Items
         // 1. Infeed stopped
         AppendChecklistItem("Infeed stopped", stateIdx >= 1, stateIdx == 0);
         // 2. Valve/pump safe
@@ -100,9 +100,13 @@ public class DeltaHMIDisplay : MonoBehaviour
         AppendChecklistItem("Z axis home (interlock)", stateIdx >= 6, stateIdx == 5);
         // 5. X axis in position
         AppendChecklistItem("X axis in position", stateIdx >= 7, stateIdx == 6);
-        // 6. Drives ready
+        // 6. Guard/sensor permissive
+        AppendChecklistItem("Guard/sensor permissive", stateIdx >= 7, false);
+        // 7. Flow totalizer reset
+        AppendChecklistItem("Flow totalizer reset", stateIdx >= 7, false);
+        // 8. Drives ready
         AppendChecklistItem("Drives ready", stateIdx >= 8, stateIdx == 7);
-        // 7. First article passed
+        // 9. First article passed
         AppendChecklistItem("First article passed", stateIdx >= 9, stateIdx == 8);
 
         textMesh.text = sb.ToString();

@@ -479,6 +479,99 @@ public static class DeltaControlPropsBuilder
         Debug.Log("[DeltaControlPropsBuilder] DeltaControlCabinet, HMI on open door, panel layout (Row 1: PLC+PSU+Servos, Row 2: VFD), and reframed ControlCam_Close added successfully under 'Cell'.");
     }
 
+    [MenuItem("Tools/Delta/Attach Camera Director")]
+    public static void AttachCameraDirector()
+    {
+        GameObject root = GameObject.Find(RootName);
+        if (root == null)
+        {
+            root = GameObject.Find("IndustrialCell_Delta");
+        }
+
+        if (root == null)
+        {
+            Debug.LogError($"[DeltaControlPropsBuilder] Scene root '{RootName}' not found! Run Tools/Delta/Build Cell first.");
+            return;
+        }
+
+        Color charcoalBg = new Color(0.05f, 0.05f, 0.06f, 1f);
+
+        // Ensure RailTopCam exists
+        GameObject railTopObj = GameObject.Find("RailTopCam");
+        if (railTopObj == null)
+        {
+            railTopObj = new GameObject("RailTopCam");
+            railTopObj.transform.SetParent(root.transform);
+            railTopObj.transform.position = new Vector3(0.0f, 2.35f, -0.15f);
+            railTopObj.transform.LookAt(new Vector3(0f, 0.96f, 0.15f));
+
+            Camera cam = railTopObj.AddComponent<Camera>();
+            cam.fieldOfView = 48f;
+            cam.nearClipPlane = 0.05f;
+            cam.farClipPlane = 50f;
+            cam.depth = 90f;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = charcoalBg;
+            cam.enabled = false;
+
+            UniversalAdditionalCameraData data = railTopObj.AddComponent<UniversalAdditionalCameraData>();
+            data.renderPostProcessing = true;
+            Undo.RegisterCreatedObjectUndo(railTopObj, "Create RailTopCam");
+        }
+
+        // Ensure NozzleSideCam exists
+        GameObject nozzleSideObj = GameObject.Find("NozzleSideCam");
+        if (nozzleSideObj == null)
+        {
+            nozzleSideObj = new GameObject("NozzleSideCam");
+            nozzleSideObj.transform.SetParent(root.transform);
+            nozzleSideObj.transform.position = new Vector3(1.10f, 1.25f, 0.55f);
+            nozzleSideObj.transform.LookAt(new Vector3(0f, 1.18f, 0.60f));
+
+            Camera cam = nozzleSideObj.AddComponent<Camera>();
+            cam.fieldOfView = 36f;
+            cam.nearClipPlane = 0.05f;
+            cam.farClipPlane = 50f;
+            cam.depth = 91f;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = charcoalBg;
+            cam.enabled = false;
+
+            UniversalAdditionalCameraData data = nozzleSideObj.AddComponent<UniversalAdditionalCameraData>();
+            data.renderPostProcessing = true;
+            Undo.RegisterCreatedObjectUndo(nozzleSideObj, "Create NozzleSideCam");
+        }
+
+        CameraDirector director = root.GetComponent<CameraDirector>();
+        if (director == null)
+        {
+            director = Undo.AddComponent<CameraDirector>(root);
+        }
+
+        // Wire sequencer reference
+        ChangeoverSequencer sequencer = root.GetComponent<ChangeoverSequencer>();
+        if (sequencer == null)
+        {
+            sequencer = Object.FindAnyObjectByType<ChangeoverSequencer>();
+        }
+        director.sequencer = sequencer;
+
+        // Wire camera references by scene name
+        GameObject heroObj = GameObject.Find("CellCam_Hero");
+        GameObject wideObj = GameObject.Find("CellCam_Wide");
+        GameObject controlObj = GameObject.Find("ControlCam_Close");
+
+        if (heroObj != null) director.heroCam = heroObj.GetComponent<Camera>();
+        if (wideObj != null) director.wideCam = wideObj.GetComponent<Camera>();
+        if (controlObj != null) director.controlCamClose = controlObj.GetComponent<Camera>();
+        if (railTopObj != null) director.railTopCam = railTopObj.GetComponent<Camera>();
+        if (nozzleSideObj != null) director.nozzleSideCam = nozzleSideObj.GetComponent<Camera>();
+
+        director.ValidateAndCacheReferences();
+        EditorUtility.SetDirty(root);
+        Debug.Log($"[DeltaControlPropsBuilder] CameraDirector attached to '{RootName}' and camera references wired.");
+    }
+
     [MenuItem("Tools/Delta/Build Full Cell")]
     public static void BuildFullCell()
     {
@@ -491,7 +584,10 @@ public static class DeltaControlPropsBuilder
         // 3. Attach changeover sequencer and wire scene references
         CellBuilder.AttachSequencer();
 
-        // 4. Re-render reflection probe so brushed steel catches cabinet reflections
+        // 4. Attach camera director and wire camera references
+        AttachCameraDirector();
+
+        // 5. Re-render reflection probe so brushed steel catches cabinet reflections
         GameObject probeObj = GameObject.Find("ReflectionProbe_Cell");
         if (probeObj != null)
         {
@@ -502,7 +598,7 @@ public static class DeltaControlPropsBuilder
             }
         }
 
-        Debug.Log("[DeltaControlPropsBuilder] Build Full Cell completed: Verified Cell + Control Props + Sequencer + Reflection Probe baked.");
+        Debug.Log("[DeltaControlPropsBuilder] Build Full Cell completed: Verified Cell + Control Props + Sequencer + Camera Director + Reflection Probe baked.");
     }
 
     private static TextMeshPro CreateWorldLabel(Transform parent, string name, Vector3 localPos, Vector3 localRot,
