@@ -86,11 +86,11 @@ public class ChangeoverSequencer : MonoBehaviour
     }
 
     [Header("Changeover Configuration")]
-    [Tooltip("Index into Recipes table for initial production (default 1 = 500ml)")]
-    public int initialRecipeIndex = 1;
+    [Tooltip("Index into Recipes table for initial production (default 0 = 250ml)")]
+    public int initialRecipeIndex = 0;
 
-    [Tooltip("Index into Recipes table for changeover target (default 2 = 1000ml)")]
-    public int targetRecipeIndex = 2;
+    [Tooltip("Index into Recipes table for changeover target (default 1 = 500ml) - matches the B_Changeover.mp4 shot list (250ml -> 500ml)")]
+    public int targetRecipeIndex = 1;
 
     [Tooltip("Loop the entire sequence continuously for demo video recording")]
     public bool loopSequence = true;
