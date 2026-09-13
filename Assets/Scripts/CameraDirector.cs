@@ -194,4 +194,33 @@ public class CameraDirector : MonoBehaviour
         activeCamera = targetCam;
         activeCameraName = (targetCam != null) ? targetCam.gameObject.name : "None";
     }
+
+    /// <summary>
+    /// Assigns (or clears, pass null) a shared RenderTexture as the targetTexture on every
+    /// managed camera. Since only the currently-enabled camera actually renders each frame,
+    /// whichever one CameraDirector switches to writes into this same texture - letting a
+    /// Recorder session (RenderTextureInputSettings pointed at this RT) capture a genuine
+    /// per-frame, state-driven multi-camera cut in ONE output file. This also sidesteps the
+    /// Editor gizmo contamination issue found in GameViewInputSettings, for the same reason
+    /// CameraInputSettings does: it's a direct render target, not the interactive Game View.
+    /// </summary>
+    public void SetSharedRenderTexture(RenderTexture rt)
+    {
+        Camera[] managedCameras = new Camera[]
+        {
+            heroCam,
+            railTopCam,
+            nozzleSideCam,
+            controlCamClose,
+            wideCam
+        };
+
+        for (int i = 0; i < managedCameras.Length; i++)
+        {
+            if (managedCameras[i] != null)
+            {
+                managedCameras[i].targetTexture = rt;
+            }
+        }
+    }
 }
