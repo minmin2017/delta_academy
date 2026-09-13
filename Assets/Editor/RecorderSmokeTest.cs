@@ -434,4 +434,102 @@ public static class RecorderSmokeTest
         }
         Debug.Log("[RecorderMulticam] Shared RenderTexture cleaned up, cameras restored to normal rendering.");
     }
+
+    // ===================================================================================
+    // A_LineOverview ZONE SEQUENCE - renders TimedShotSwitcher's full 80s zone-callout
+    // sequence (Infeed -> Filling -> Capping -> EndOfLine -> ControlCam_Close) into one
+    // file, same shared-RenderTexture technique as the B_Changeover multicam render.
+    // ===================================================================================
+    private static TimedShotSwitcher s_ShotSwitcher;
+
+    [MenuItem("Tools/Delta/Render A_LineOverview ZONES (80s, 720p)")]
+    public static void RenderZoneSequence()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            Debug.Log("[RecorderZones] Not in Play Mode - entering Play Mode first.");
+            EditorApplication.playModeStateChanged += OnPlayModeChangedZones;
+            EditorApplication.isPlaying = true;
+            return;
+        }
+        StartZoneRecordingNow();
+    }
+
+    private static void OnPlayModeChangedZones(PlayModeStateChange state)
+    {
+        if (state == PlayModeStateChange.EnteredPlayMode)
+        {
+            EditorApplication.playModeStateChanged -= OnPlayModeChangedZones;
+            StartZoneRecordingNow();
+        }
+    }
+
+    private static void StartZoneRecordingNow()
+    {
+        s_ShotSwitcher = UnityEngine.Object.FindAnyObjectByType<TimedShotSwitcher>();
+        if (s_ShotSwitcher == null)
+        {
+            Debug.LogError("[RecorderZones] No TimedShotSwitcher found - run Tools/Delta/Attach A-Clip Shot Switcher first.");
+            return;
+        }
+
+        const int width = 1280;
+        const int height = 720;
+        s_SharedRT = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
+        s_SharedRT.name = "ZoneSequenceSharedRT";
+        s_SharedRT.Create();
+        s_ShotSwitcher.SetSharedRenderTexture(s_SharedRT);
+        s_ShotSwitcher.Restart();
+
+        const float durationSeconds = 80f;
+        const float fps = 30f;
+        int totalFrames = Mathf.RoundToInt(durationSeconds * fps);
+
+        var controllerSettings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
+        controllerSettings.SetRecordModeToFrameInterval(0, totalFrames);
+        controllerSettings.FrameRatePlayback = FrameRatePlayback.Constant;
+        controllerSettings.FrameRate = fps;
+        controllerSettings.CapFrameRate = true;
+
+        var movieSettings = ScriptableObject.CreateInstance<MovieRecorderSettings>();
+        movieSettings.name = "ALineOverviewZonesRecorder";
+        movieSettings.Enabled = true;
+#pragma warning disable CS0618
+        movieSettings.OutputFormat = MovieRecorderSettings.VideoRecorderOutputFormat.MP4;
+        movieSettings.VideoBitRateMode = UnityEditor.VideoBitrateMode.High;
+#pragma warning restore CS0618
+
+        movieSettings.ImageInputSettings = new RenderTextureInputSettings { RenderTexture = s_SharedRT };
+        movieSettings.CaptureAudio = false;
+
+        string projectRoot = Path.GetDirectoryName(Application.dataPath);
+        string outDir = Path.Combine(projectRoot, "Recordings");
+        if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+        string fileBase = "A_LineOverview_ZONES_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        movieSettings.OutputFile = Path.Combine(outDir, fileBase);
+        LastOutputPath = movieSettings.OutputFile + ".mp4";
+
+        controllerSettings.AddRecorderSettings(movieSettings);
+        s_Controller = new RecorderController(controllerSettings);
+        s_Controller.PrepareRecording();
+        s_Controller.StartRecording();
+
+        Debug.Log("[RecorderZones] Started " + durationSeconds + "s zone-sequence render. Expecting output at: " + LastOutputPath);
+    }
+
+    [MenuItem("Tools/Delta/Cleanup Zone Sequence RenderTexture")]
+    public static void CleanupZoneSequenceRenderTexture()
+    {
+        if (s_ShotSwitcher != null)
+        {
+            s_ShotSwitcher.SetSharedRenderTexture(null);
+        }
+        if (s_SharedRT != null)
+        {
+            s_SharedRT.Release();
+            UnityEngine.Object.DestroyImmediate(s_SharedRT);
+            s_SharedRT = null;
+        }
+        Debug.Log("[RecorderZones] Shared RenderTexture cleaned up, cameras restored to normal rendering.");
+    }
 }
