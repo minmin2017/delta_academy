@@ -91,4 +91,76 @@ public static class RecorderSmokeTest
         Debug.Log("[RecorderSmokeTest] recording=" + recording + " outputPath=" + LastOutputPath
             + " fileExists=" + fileExists + " fileSizeBytes=" + fileSize);
     }
+
+    // ===================================================================================
+    // REAL DRAFT RENDER - raw uncut footage of B_Changeover via CellCam_Hero (CameraDirector
+    // auto-switches to RailTopCam/NozzleSideCam as the sequence progresses through its states).
+    // This is NOT an edited/narrated final clip - it is real gameplay footage of the verified
+    // scene running its actual changeover sequence, meant as raw material for an edit pass.
+    // ===================================================================================
+    [MenuItem("Tools/Delta/Render B_Changeover Draft (45s, 720p)")]
+    public static void RenderChangeoverDraft()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            Debug.Log("[RecorderDraft] Not in Play Mode - entering Play Mode first, draft render will start automatically.");
+            EditorApplication.playModeStateChanged += OnPlayModeChangedDraft;
+            EditorApplication.isPlaying = true;
+            return;
+        }
+        StartDraftRecordingNow();
+    }
+
+    private static void OnPlayModeChangedDraft(PlayModeStateChange state)
+    {
+        if (state == PlayModeStateChange.EnteredPlayMode)
+        {
+            EditorApplication.playModeStateChanged -= OnPlayModeChangedDraft;
+            StartDraftRecordingNow();
+        }
+    }
+
+    private static void StartDraftRecordingNow()
+    {
+        const float durationSeconds = 45f;
+        const float fps = 30f;
+        int totalFrames = Mathf.RoundToInt(durationSeconds * fps);
+
+        var controllerSettings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
+        controllerSettings.SetRecordModeToFrameInterval(0, totalFrames);
+        controllerSettings.FrameRatePlayback = FrameRatePlayback.Constant;
+        controllerSettings.FrameRate = fps;
+        controllerSettings.CapFrameRate = true;
+
+        var movieSettings = ScriptableObject.CreateInstance<MovieRecorderSettings>();
+        movieSettings.name = "BChangeoverDraftRecorder";
+        movieSettings.Enabled = true;
+#pragma warning disable CS0618
+        movieSettings.OutputFormat = MovieRecorderSettings.VideoRecorderOutputFormat.MP4;
+        movieSettings.VideoBitRateMode = UnityEditor.VideoBitrateMode.High;
+#pragma warning restore CS0618
+
+        var imageInput = new GameViewInputSettings
+        {
+            OutputWidth = 1280,
+            OutputHeight = 720
+        };
+        movieSettings.ImageInputSettings = imageInput;
+        movieSettings.CaptureAudio = false;
+
+        string projectRoot = Path.GetDirectoryName(Application.dataPath);
+        string outDir = Path.Combine(projectRoot, "Recordings");
+        if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+        string fileBase = "B_Changeover_DRAFT_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        movieSettings.OutputFile = Path.Combine(outDir, fileBase);
+        LastOutputPath = movieSettings.OutputFile + ".mp4";
+
+        controllerSettings.AddRecorderSettings(movieSettings);
+
+        s_Controller = new RecorderController(controllerSettings);
+        s_Controller.PrepareRecording();
+        s_Controller.StartRecording();
+
+        Debug.Log("[RecorderDraft] Started " + durationSeconds + "s draft render at 1280x720. Expecting output at: " + LastOutputPath);
+    }
 }
