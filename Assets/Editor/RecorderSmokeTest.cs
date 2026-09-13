@@ -163,4 +163,104 @@ public static class RecorderSmokeTest
 
         Debug.Log("[RecorderDraft] Started " + durationSeconds + "s draft render at 1280x720. Expecting output at: " + LastOutputPath);
     }
+
+    // ===================================================================================
+    // A_LineOverview DRAFT - isolates TravelingEstablishingCam (normally disabled, not part
+    // of CameraDirector's B-clip state switching) by temporarily disabling every other camera,
+    // records its full travel duration, then restores every camera's prior enabled state.
+    // ===================================================================================
+    private static System.Collections.Generic.Dictionary<Camera, bool> s_SavedCameraStates;
+
+    [MenuItem("Tools/Delta/Render A_LineOverview Draft (Traveling Cam)")]
+    public static void RenderLineOverviewDraft()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            Debug.Log("[RecorderDraftA] Not in Play Mode - entering Play Mode first.");
+            EditorApplication.playModeStateChanged += OnPlayModeChangedDraftA;
+            EditorApplication.isPlaying = true;
+            return;
+        }
+        StartDraftARecordingNow();
+    }
+
+    private static void OnPlayModeChangedDraftA(PlayModeStateChange state)
+    {
+        if (state == PlayModeStateChange.EnteredPlayMode)
+        {
+            EditorApplication.playModeStateChanged -= OnPlayModeChangedDraftA;
+            StartDraftARecordingNow();
+        }
+    }
+
+    private static void StartDraftARecordingNow()
+    {
+        GameObject travelCamObj = GameObject.Find("TravelingEstablishingCam");
+        if (travelCamObj == null)
+        {
+            Debug.LogError("[RecorderDraftA] TravelingEstablishingCam not found - run Tools/Delta/Add Traveling Establishing Camera first.");
+            return;
+        }
+        Camera travelCam = travelCamObj.GetComponent<Camera>();
+        TravelingCamera travelScript = travelCamObj.GetComponent<TravelingCamera>();
+
+        // Save and disable every other camera so only the traveling cam is visible in Game View.
+        s_SavedCameraStates = new System.Collections.Generic.Dictionary<Camera, bool>();
+        Camera[] allCams = UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (Camera c in allCams)
+        {
+            if (c == travelCam) continue;
+            s_SavedCameraStates[c] = c.enabled;
+            c.enabled = false;
+        }
+        travelCam.enabled = true;
+        if (travelScript != null) travelScript.Replay();
+
+        float durationSeconds = (travelScript != null) ? travelScript.duration + 0.5f : 10.5f;
+        const float fps = 30f;
+        int totalFrames = Mathf.RoundToInt(durationSeconds * fps);
+
+        var controllerSettings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
+        controllerSettings.SetRecordModeToFrameInterval(0, totalFrames);
+        controllerSettings.FrameRatePlayback = FrameRatePlayback.Constant;
+        controllerSettings.FrameRate = fps;
+        controllerSettings.CapFrameRate = true;
+
+        var movieSettings = ScriptableObject.CreateInstance<MovieRecorderSettings>();
+        movieSettings.name = "ALineOverviewDraftRecorder";
+        movieSettings.Enabled = true;
+#pragma warning disable CS0618
+        movieSettings.OutputFormat = MovieRecorderSettings.VideoRecorderOutputFormat.MP4;
+        movieSettings.VideoBitRateMode = UnityEditor.VideoBitrateMode.High;
+#pragma warning restore CS0618
+
+        movieSettings.ImageInputSettings = new GameViewInputSettings { OutputWidth = 1280, OutputHeight = 720 };
+        movieSettings.CaptureAudio = false;
+
+        string projectRoot = Path.GetDirectoryName(Application.dataPath);
+        string outDir = Path.Combine(projectRoot, "Recordings");
+        if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+        string fileBase = "A_LineOverview_DRAFT_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        movieSettings.OutputFile = Path.Combine(outDir, fileBase);
+        LastOutputPath = movieSettings.OutputFile + ".mp4";
+
+        controllerSettings.AddRecorderSettings(movieSettings);
+        s_Controller = new RecorderController(controllerSettings);
+        s_Controller.PrepareRecording();
+        s_Controller.StartRecording();
+
+        Debug.Log("[RecorderDraftA] Started " + durationSeconds + "s traveling-cam draft render. Expecting output at: " + LastOutputPath);
+    }
+
+    [MenuItem("Tools/Delta/Restore Camera States After A-Draft")]
+    public static void RestoreCameraStates()
+    {
+        if (s_SavedCameraStates == null) { Debug.Log("[RecorderDraftA] No saved camera states to restore."); return; }
+        foreach (var kv in s_SavedCameraStates)
+        {
+            if (kv.Key != null) kv.Key.enabled = kv.Value;
+        }
+        s_SavedCameraStates = null;
+        Debug.Log("[RecorderDraftA] Camera states restored.");
+    }
 }
