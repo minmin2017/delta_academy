@@ -132,18 +132,27 @@ public class CameraDirector : MonoBehaviour
     {
         switch (state)
         {
+            case ChangeoverSequencer.ChangeoverState.S1_StopInfeed:
+                // Original shot list calls for an HMI close-up here (operator's recipe request
+                // moment, 0:08-0:16 in the plan doc) - ControlCam_Close was wired into
+                // CameraDirector but never actually used in this switch until now.
+                return (controlCamClose != null) ? controlCamClose : heroCam;
+
             case ChangeoverSequencer.ChangeoverState.S6_RetractNozzleToHome:
                 return (nozzleSideCam != null) ? nozzleSideCam : heroCam;
 
             case ChangeoverSequencer.ChangeoverState.S7_AdjustRailWidth:
                 return (railTopCam != null) ? railTopCam : heroCam;
 
-            case ChangeoverSequencer.ChangeoverState.S1_StopInfeed:
+            case ChangeoverSequencer.ChangeoverState.S8_ConfirmInPosition:
+                // Shot list's "confirm ready to produce" checklist beat (1:04-1:12) - HMI
+                // checklist ticks are most legible on the close-up, same reasoning as S1.
+                return (controlCamClose != null) ? controlCamClose : heroCam;
+
             case ChangeoverSequencer.ChangeoverState.S2_CompleteInFlightFill:
             case ChangeoverSequencer.ChangeoverState.S3_CloseValveStopPump:
             case ChangeoverSequencer.ChangeoverState.S4_ClearBottlesFromZone:
             case ChangeoverSequencer.ChangeoverState.S5_StopBelt:
-            case ChangeoverSequencer.ChangeoverState.S8_ConfirmInPosition:
             case ChangeoverSequencer.ChangeoverState.S9_FirstArticleCheck:
             case ChangeoverSequencer.ChangeoverState.S10_ResumeProduction:
             default:
