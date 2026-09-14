@@ -338,6 +338,7 @@ public static class RecorderSmokeTest
     private static CameraDirector s_Director;
     private static MotionHighlightController s_MotionHighlight;
     private static EquipmentIntroSequencer s_EquipmentIntro;
+    private static HardwareCommandVisualizer s_CommandVisualizer;
 
     [MenuItem("Tools/Delta/Render B_Changeover MULTICAM (45s, 720p)")]
     public static void RenderChangeoverMulticam()
@@ -442,6 +443,116 @@ public static class RecorderSmokeTest
         Debug.Log("[RecorderMulticam] Started " + durationSeconds + "s multicam draft render. Expecting output at: " + LastOutputPath);
     }
 
+    // ===================================================================================
+    // B_Changeover 90s EXPANDED RENDER - renders full ~90s Changeover demonstration:
+    //   S0A_SelectRecipe (12s): HMI bottle silhouettes comparison & 500ml selection
+    //   S0B_LoadParameters (13s): 5 recipe parameters streaming into AS320T-B registers
+    //   S1-S5 (16.5s): Stop infeed, finish dive fill, clear bottles, belt stop
+    //   S6 (6.5s): PLC -> Servo ASD-A3 (Z) pulse train homing retract (1250mm)
+    //   S7 (8.5s): PLC -> Servo ASD-A3 (X) pulse train rail gap adjustment (58 -> 73mm)
+    //   S8 (5.0s): PLC -> VFD MS300 Modbus RTU RS-485 speed preset (0.20 m/s) + HMI check
+    //   S9 (18.0s): First article 500ml test bottle infeed, dive-fill & exit
+    //   S10 (13.0s): Full speed production resume
+    // Total duration: 89.0s (2670 frames @ 30fps).
+    // ===================================================================================
+    [MenuItem("Tools/Delta/Render B_Changeover (90s, 720p)")]
+    public static void RenderChangeover90s()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            Debug.Log("[Recorder90s] Not in Play Mode - entering Play Mode first.");
+            EditorApplication.playModeStateChanged += OnPlayModeChanged90s;
+            EditorApplication.isPlaying = true;
+            return;
+        }
+        StartChangeover90sRecordingNow();
+    }
+
+    private static void OnPlayModeChanged90s(PlayModeStateChange state)
+    {
+        if (state == PlayModeStateChange.EnteredPlayMode)
+        {
+            EditorApplication.playModeStateChanged -= OnPlayModeChanged90s;
+            StartChangeover90sRecordingNow();
+        }
+    }
+
+    private static void StartChangeover90sRecordingNow()
+    {
+        s_Director = UnityEngine.Object.FindAnyObjectByType<CameraDirector>();
+        if (s_Director == null)
+        {
+            Debug.LogError("[Recorder90s] No CameraDirector found in scene - run Tools/Delta/Attach Camera Director first.");
+            return;
+        }
+
+        s_ShotSwitcher = UnityEngine.Object.FindAnyObjectByType<TimedShotSwitcher>();
+        if (s_ShotSwitcher != null)
+        {
+            s_ShotSwitcher.autoPlayOnStart = false;
+            s_ShotSwitcher.Pause();
+        }
+        s_EquipmentIntro = UnityEngine.Object.FindAnyObjectByType<EquipmentIntroSequencer>();
+        if (s_EquipmentIntro != null)
+        {
+            s_EquipmentIntro.autoPlayOnStart = false;
+            s_EquipmentIntro.Pause();
+            s_EquipmentIntro.enabled = false;
+        }
+        if (s_Director != null) s_Director.autoSwitchOnState = true;
+
+        s_MotionHighlight = UnityEngine.Object.FindAnyObjectByType<MotionHighlightController>();
+        if (s_MotionHighlight != null) s_MotionHighlight.enabled = true;
+
+        s_CommandVisualizer = UnityEngine.Object.FindAnyObjectByType<HardwareCommandVisualizer>();
+        if (s_CommandVisualizer != null) s_CommandVisualizer.enabled = true;
+
+        const int width = 1280;
+        const int height = 720;
+        s_SharedRT = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
+        s_SharedRT.name = "Changeover90sSharedRT";
+        s_SharedRT.Create();
+        s_Director.SetSharedRenderTexture(s_SharedRT);
+
+        const float durationSeconds = 89.0f;
+        const float fps = 30f;
+        int totalFrames = Mathf.RoundToInt(durationSeconds * fps);
+
+        var controllerSettings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
+        controllerSettings.SetRecordModeToFrameInterval(0, totalFrames);
+        controllerSettings.FrameRatePlayback = FrameRatePlayback.Constant;
+        controllerSettings.FrameRate = fps;
+        controllerSettings.CapFrameRate = true;
+
+        var movieSettings = ScriptableObject.CreateInstance<MovieRecorderSettings>();
+        movieSettings.name = "BChangeover90sRecorder";
+        movieSettings.Enabled = true;
+#pragma warning disable CS0618
+        movieSettings.OutputFormat = MovieRecorderSettings.VideoRecorderOutputFormat.MP4;
+        movieSettings.VideoBitRateMode = UnityEditor.VideoBitrateMode.High;
+#pragma warning restore CS0618
+
+        movieSettings.ImageInputSettings = new RenderTextureInputSettings
+        {
+            RenderTexture = s_SharedRT
+        };
+        movieSettings.CaptureAudio = false;
+
+        string projectRoot = Path.GetDirectoryName(Application.dataPath);
+        string outDir = Path.Combine(projectRoot, "Recordings");
+        if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+        string fileBase = "B_Changeover_90s_RAW_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        movieSettings.OutputFile = Path.Combine(outDir, fileBase);
+        LastOutputPath = movieSettings.OutputFile + ".mp4";
+
+        controllerSettings.AddRecorderSettings(movieSettings);
+        s_Controller = new RecorderController(controllerSettings);
+        s_Controller.PrepareRecording();
+        s_Controller.StartRecording();
+
+        Debug.Log("[Recorder90s] Started " + durationSeconds + "s changeover 90s render. Expecting output at: " + LastOutputPath);
+    }
+
     [MenuItem("Tools/Delta/Cleanup Multicam RenderTexture")]
     public static void CleanupMulticamRenderTexture()
     {
@@ -456,6 +567,10 @@ public static class RecorderSmokeTest
         if (s_EquipmentIntro != null)
         {
             s_EquipmentIntro.enabled = true;
+        }
+        if (s_CommandVisualizer != null)
+        {
+            s_CommandVisualizer.CleanupAll();
         }
         if (s_SharedRT != null)
         {
@@ -524,6 +639,20 @@ public static class RecorderSmokeTest
         // Filling Zone shot). Disable the whole component for the duration of this render.
         s_MotionHighlight = UnityEngine.Object.FindAnyObjectByType<MotionHighlightController>();
         if (s_MotionHighlight != null) s_MotionHighlight.enabled = false;
+
+        s_CommandVisualizer = UnityEngine.Object.FindAnyObjectByType<HardwareCommandVisualizer>();
+        if (s_CommandVisualizer != null)
+        {
+            s_CommandVisualizer.CleanupAll();
+            s_CommandVisualizer.enabled = false;
+        }
+
+        s_CommandVisualizer = UnityEngine.Object.FindAnyObjectByType<HardwareCommandVisualizer>();
+        if (s_CommandVisualizer != null)
+        {
+            s_CommandVisualizer.CleanupAll();
+            s_CommandVisualizer.enabled = false;
+        }
 
         s_EquipmentIntro = UnityEngine.Object.FindAnyObjectByType<EquipmentIntroSequencer>();
         if (s_EquipmentIntro != null)

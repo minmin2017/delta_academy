@@ -73,6 +73,8 @@ public class ChangeoverSequencer : MonoBehaviour
     // =========================================================================
     public enum ChangeoverState
     {
+        S0A_SelectRecipe,        // Pre-roll Step 2: HMI Recipe Selection & confirmation
+        S0B_LoadParameters,      // Pre-roll Step 3: Loading 5 parameters animation
         S1_StopInfeed,           // Stop admitting new bottles
         S2_CompleteInFlightFill, // Finish the fill already in progress
         S3_CloseValveStopPump,   // Close fill valve & stop pump
@@ -185,6 +187,8 @@ public class ChangeoverSequencer : MonoBehaviour
     // Runtime state tracking
     private Recipe currentRecipe;
     private Recipe targetRecipe;
+    public Recipe CurrentRecipe => currentRecipe;
+    public Recipe TargetRecipe => targetRecipe;
     private float currentBeltSpeed = 0f;
     private float beltUvOffset = 0f;
     private bool s6CompleteConfirmed = false;
@@ -363,7 +367,7 @@ public class ChangeoverSequencer : MonoBehaviour
         }
 
         s6CompleteConfirmed = false;
-        EnterState(ChangeoverState.S1_StopInfeed);
+        EnterState(ChangeoverState.S0A_SelectRecipe);
     }
 
     private void Update()
@@ -393,6 +397,22 @@ public class ChangeoverSequencer : MonoBehaviour
 
         switch (currentState)
         {
+            case ChangeoverState.S0A_SelectRecipe:
+                // Pre-roll Step 2: HMI Recipe Selection (12.0s total: 0-6.5s selection, 6.5-12.0s confirmation)
+                stateDuration = 12.0f;
+                currentBeltSpeed = 0f;
+                SetNozzleWorldY(GetRecipeClearY(currentRecipe));
+                SetRailGap(currentRecipe.railGap);
+                break;
+
+            case ChangeoverState.S0B_LoadParameters:
+                // Pre-roll Step 3: Loading 5 recipe parameters sequentially into AS320T-B PLC registers (13.0s)
+                stateDuration = 13.0f;
+                currentBeltSpeed = 0f;
+                SetNozzleWorldY(GetRecipeClearY(currentRecipe));
+                SetRailGap(currentRecipe.railGap);
+                break;
+
             case ChangeoverState.S1_StopInfeed:
                 // S1: Derive exact duration to carry inFlightBottle from InitialBottleStartZ (0.0) to FillStationZ (0.60)
                 // at single belt speed without double speed reliance
@@ -442,7 +462,7 @@ public class ChangeoverSequencer : MonoBehaviour
 
             case ChangeoverState.S6_RetractNozzleToHome:
                 // Z axis servo returns from recipe-clear height to Home height (1.25m) FIRST. Rails remain locked.
-                stateDuration = 2.5f;
+                stateDuration = 6.5f;
                 currentBeltSpeed = 0f;
                 s6CompleteConfirmed = false;
                 break;
@@ -450,7 +470,7 @@ public class ChangeoverSequencer : MonoBehaviour
             case ChangeoverState.S7_AdjustRailWidth:
                 // X axis servo adjusts rails symmetrically to target railGap.
                 // HARDWARE INTERLOCK ENFORCEMENT:
-                stateDuration = 3.0f;
+                stateDuration = 8.5f;
                 currentBeltSpeed = 0f;
 
                 if (nozzleAssembly == null)
@@ -474,8 +494,8 @@ public class ChangeoverSequencer : MonoBehaviour
                 break;
 
             case ChangeoverState.S8_ConfirmInPosition:
-                // Both axes dwell & verify drive-ready
-                stateDuration = 1.5f;
+                // Both axes dwell & verify drive-ready + VFD speed preset via Modbus RTU
+                stateDuration = 5.0f;
                 currentBeltSpeed = 0f;
                 break;
 
@@ -501,7 +521,7 @@ public class ChangeoverSequencer : MonoBehaviour
             case ChangeoverState.S10_ResumeProduction:
                 currentRecipe = targetRecipe;
                 currentBeltSpeed = targetRecipe.beltSpeed;
-                stateDuration = 8.0f;
+                stateDuration = 22.0f;
                 productionSpawnTimer = 0f;
                 break;
         }
@@ -514,6 +534,13 @@ public class ChangeoverSequencer : MonoBehaviour
 
         switch (currentState)
         {
+            case ChangeoverState.S0A_SelectRecipe:
+            case ChangeoverState.S0B_LoadParameters:
+                currentBeltSpeed = 0f;
+                SetNozzleWorldY(GetRecipeClearY(currentRecipe));
+                SetRailGap(currentRecipe.railGap);
+                break;
+
             case ChangeoverState.S1_StopInfeed:
                 // In-flight bottle advances ONLY via UpdateBottlePositions at currentRecipe.beltSpeed
                 SetNozzleWorldY(GetRecipeClearY(currentRecipe));
@@ -761,7 +788,7 @@ public class ChangeoverSequencer : MonoBehaviour
 
         s6CompleteConfirmed = false;
         accumulatedTime = 0f;
-        EnterState(ChangeoverState.S1_StopInfeed);
+        EnterState(ChangeoverState.S0A_SelectRecipe);
     }
 
     private void UpdateConveyorMotion(float dt)

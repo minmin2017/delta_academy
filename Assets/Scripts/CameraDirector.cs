@@ -123,6 +123,15 @@ public class CameraDirector : MonoBehaviour
             if (obj != null) controlCamClose = obj.GetComponent<Camera>();
         }
 
+        // Guarantee ControlCam_Close directly frames HMI screen front-and-center
+        if (controlCamClose != null)
+        {
+            controlCamClose.transform.position = new Vector3(-0.82f, 1.25f, 1.18f);
+            controlCamClose.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+            controlCamClose.fieldOfView = 50f;
+            controlCamClose.nearClipPlane = 0.01f;
+        }
+
         if (wideCam == null)
         {
             GameObject obj = GameObject.Find("CellCam_Wide");
@@ -137,11 +146,14 @@ public class CameraDirector : MonoBehaviour
     {
         switch (state)
         {
-            case ChangeoverSequencer.ChangeoverState.S1_StopInfeed:
-                // Original shot list calls for an HMI close-up here (operator's recipe request
-                // moment, 0:08-0:16 in the plan doc) - ControlCam_Close was wired into
-                // CameraDirector but never actually used in this switch until now.
+            case ChangeoverSequencer.ChangeoverState.S0A_SelectRecipe:
+            case ChangeoverSequencer.ChangeoverState.S0B_LoadParameters:
+                // Pre-roll HMI direct framing (0-25s): operator recipe selection & 5-parameter loading animation
                 return (controlCamClose != null) ? controlCamClose : heroCam;
+
+            case ChangeoverSequencer.ChangeoverState.S1_StopInfeed:
+                // Conveyor infeed hero overview as last bottle approaches
+                return (heroCam != null) ? heroCam : null;
 
             case ChangeoverSequencer.ChangeoverState.S2_CompleteInFlightFill:
             case ChangeoverSequencer.ChangeoverState.S3_CloseValveStopPump:
@@ -153,8 +165,7 @@ public class CameraDirector : MonoBehaviour
                 return (railTopCam != null) ? railTopCam : heroCam;
 
             case ChangeoverSequencer.ChangeoverState.S8_ConfirmInPosition:
-                // Shot list's "confirm ready to produce" checklist beat (1:04-1:12) - HMI
-                // checklist ticks are most legible on the close-up, same reasoning as S1.
+                // Checklist verification beat on HMI close-up
                 return (controlCamClose != null) ? controlCamClose : heroCam;
 
             case ChangeoverSequencer.ChangeoverState.S4_ClearBottlesFromZone:

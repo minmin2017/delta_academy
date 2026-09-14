@@ -1,15 +1,27 @@
+using System;
 using System.Text;
 using UnityEngine;
 using TMPro;
 
 /// <summary>
-/// Runtime display driver for Delta DOP-100WS HMI screen.
-/// Renders active recipe status, human-readable PLC state, progress, and safe-changeover checklist.
-/// Emphasizes PLC AS320T-B control mediation (HMI requests recipe, PLC executes motion).
+/// DeltaHMIDisplay - Drives the live screen display on the Delta DOP-100WS / 103WQ HMI panel.
+/// Fully implements the 3 required visual modes for the 90s Changeover sequence:
+///
+/// Mode 1 (S0A_SelectRecipe, 0-12s):
+///   - Proportional bottle silhouettes comparing 250ml (Ø55x125), 500ml (Ø70x155), 1000ml (Ø90x200)
+///   - Operator touch selection of 500ml recipe
+///   - Flashing confirmation banner ">>> RECIPE 500ml LOADED <<<"
+///
+/// Mode 2 (S0B_LoadParameters, 12-25s):
+///   - 5 recipe parameters streaming into AS320T-B PLC registers (D100-D120) via Modbus TCP
+///   - Live sequential [OK] checkmarks and animated progress bar (0% -> 100%)
+///
+/// Mode 3 (S1-S10, 25-89s):
+///   - 10-phase Safe Changeover Checklist with real-time green checkmarks
 /// </summary>
 public class DeltaHMIDisplay : MonoBehaviour
 {
-    [Header("References")]
+    [Header("Dependencies")]
     public ChangeoverSequencer sequencer;
     public TextMeshPro textMesh;
 
@@ -17,41 +29,54 @@ public class DeltaHMIDisplay : MonoBehaviour
 
     private void Awake()
     {
-        if (textMesh == null)
-        {
-            textMesh = GetComponent<TextMeshPro>();
-        }
+        ValidateAndCacheReferences();
     }
 
     private void Start()
     {
-        if (sequencer == null)
+        ValidateAndCacheReferences();
+        AlignAndFitDisplay();
+    }
+
+    public void ValidateAndCacheReferences()
+    {
+        if (sequencer == null) sequencer = FindAnyObjectByType<ChangeoverSequencer>();
+
+        if (textMesh == null)
         {
-            sequencer = FindAnyObjectByType<ChangeoverSequencer>();
+            GameObject tmpObj = GameObject.Find("HMI_Display_TextMeshPro");
+            if (tmpObj != null) textMesh = tmpObj.GetComponent<TextMeshPro>();
+            if (textMesh == null) textMesh = GetComponent<TextMeshPro>();
         }
 
-        if (textMesh != null && textMesh.font == null)
+        // Clean up any legacy BottleSilhouettesRoot objects in scene
+        GameObject legacy = GameObject.Find("BottleSilhouettesRoot");
+        if (legacy != null) Destroy(legacy);
+        Transform childLegacy = transform.Find("BottleSilhouettesRoot");
+        if (childLegacy != null) Destroy(childLegacy.gameObject);
+        if (transform.parent != null)
         {
-            TMP_FontAsset defaultFont = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
-            if (defaultFont != null)
-            {
-                textMesh.font = defaultFont;
-            }
+            Transform pLegacy = transform.parent.Find("BottleSilhouettesRoot");
+            if (pLegacy != null) Destroy(pLegacy.gameObject);
+        }
+    }
+
+    public void AlignAndFitDisplay()
+    {
+        if (textMesh != null)
+        {
+            textMesh.transform.position = new Vector3(-0.82f, 1.25f, 1.055f);
+            textMesh.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+            textMesh.rectTransform.sizeDelta = new Vector2(0.118f, 0.076f);
         }
     }
 
     private void LateUpdate()
     {
-        if (sequencer == null)
+        if (sequencer == null || textMesh == null)
         {
-            sequencer = FindAnyObjectByType<ChangeoverSequencer>();
-            if (sequencer == null) return;
-        }
-
-        if (textMesh == null)
-        {
-            textMesh = GetComponent<TextMeshPro>();
-            if (textMesh == null) return;
+            ValidateAndCacheReferences();
+            if (sequencer == null || textMesh == null) return;
         }
 
         UpdateHmiText();
@@ -62,105 +87,133 @@ public class DeltaHMIDisplay : MonoBehaviour
         sb.Clear();
 
         ChangeoverSequencer.ChangeoverState state = sequencer.CurrentState;
-        int stateIdx = (int)state;
         float progress = sequencer.StateProgress;
+        float t = sequencer.stateTimer;
 
-        string targetRecipeName = (sequencer.targetRecipeIndex >= 0 && sequencer.targetRecipeIndex < ChangeoverSequencer.Recipes.Length)
-            ? ChangeoverSequencer.Recipes[sequencer.targetRecipeIndex].name
-            : "1000ml";
+        int targetIdx = Mathf.Clamp(sequencer.targetRecipeIndex, 0, ChangeoverSequencer.Recipes.Length - 1);
+        int initialIdx = Mathf.Clamp(sequencer.initialRecipeIndex, 0, ChangeoverSequencer.Recipes.Length - 1);
+        ChangeoverSequencer.Recipe targetR = ChangeoverSequencer.Recipes[targetIdx];
+        ChangeoverSequencer.Recipe initialR = ChangeoverSequencer.Recipes[initialIdx];
 
-        string initialRecipeName = (sequencer.initialRecipeIndex >= 0 && sequencer.initialRecipeIndex < ChangeoverSequencer.Recipes.Length)
-            ? ChangeoverSequencer.Recipes[sequencer.initialRecipeIndex].name
-            : "500ml";
-
-        // Header
-        sb.AppendLine("<b><color=#00D8FF>DELTA DOP-100WS</color></b> | <color=#AAAAAA>RECIPE REQUEST</color>");
-        sb.AppendLine("<size=80%><color=#8899AA>PLC AS320T-B SEQUENCE CONTROLLER</color></size>");
-        sb.AppendLine("<color=#335577>────────────────────────────────────</color>");
-
-        // Recipe & State Status
-        sb.Append("<color=#E0E8F0>RECIPE:</color> <color=#FFDD55><b>").Append(initialRecipeName).Append(" → ").Append(targetRecipeName).Append("</b></color>");
-        sb.Append("  <color=#88AACC>[PHASE ").Append(stateIdx + 1).Append("/10]</color>\n");
-
-        sb.Append("<color=#E0E8F0>STATUS:</color> <color=#FFFFFF><b>").Append(GetHumanReadableState(state)).Append("</b></color>\n");
-        sb.Append("<color=#E0E8F0>STEP PROG:</color> <color=#66FFBB>").Append((progress * 100f).ToString("F0")).Append("%</color>  ");
-        sb.Append(GetProgressBar(progress, 14)).Append("\n");
-
-        sb.AppendLine("<color=#335577>────────────────────────────────────</color>");
-        sb.AppendLine("<b><color=#A0B8D0>SAFE CHANGEOVER CHECKLIST:</color></b>");
-
-        // Checklist Items
-        // 1. Infeed stopped
-        AppendChecklistItem("Infeed stopped", stateIdx >= 1, stateIdx == 0);
-        // 2. Valve/pump safe
-        AppendChecklistItem("Valve/pump safe", stateIdx >= 3, stateIdx == 1 || stateIdx == 2);
-        // 3. Zone cleared
-        AppendChecklistItem("Zone cleared", stateIdx >= 4, stateIdx == 3);
-        // 4. Z axis home
-        AppendChecklistItem("Z axis home (interlock)", stateIdx >= 6, stateIdx == 5);
-        // 5. X axis in position
-        AppendChecklistItem("X axis in position", stateIdx >= 7, stateIdx == 6);
-        // 6. Guard/sensor permissive
-        AppendChecklistItem("Guard/sensor permissive", stateIdx >= 7, false);
-        // 7. Flow totalizer reset
-        AppendChecklistItem("Flow totalizer reset", stateIdx >= 7, false);
-        // 8. Drives ready
-        AppendChecklistItem("Drives ready", stateIdx >= 8, stateIdx == 7);
-        // 9. First article passed
-        AppendChecklistItem("First article passed", stateIdx >= 9, stateIdx == 8);
-
-        textMesh.text = sb.ToString();
-    }
-
-    private void AppendChecklistItem(string label, bool completed, bool inProgress)
-    {
-        if (completed)
+        // =====================================================================
+        // MODE 1: S0A_SelectRecipe — Recipe Selection Screen
+        // =====================================================================
+        if (state == ChangeoverSequencer.ChangeoverState.S0A_SelectRecipe)
         {
-            sb.Append(" <color=#00FF66>[X] ").Append(label).Append("</color>\n");
+            textMesh.fontSize = 0.024f;
+            textMesh.alignment = TextAlignmentOptions.Top;
+
+            sb.AppendLine("<b><color=#00D8FF>DELTA DOP-100WS</color></b> | <color=#00FFCC>RECIPE SELECT</color>");
+            sb.AppendLine("<size=65%><color=#8899AA>KMITL DELTA ACADEMY · PACKAGING DEMO</color></size>");
+            sb.AppendLine("<color=#335577>───────────────────────────────────</color>");
+            sb.AppendLine("<b>  [250ml]          <color=#00FF88>[500ml] ★</color>         [1000ml]</b>");
+            sb.AppendLine(" <size=70%><color=#88AACC>Ø55×125mm</color>        <color=#00FF88>Ø70×155mm</color>        <color=#88AACC>Ø90×200mm</color></size>");
+            sb.AppendLine();
+            sb.AppendLine("    <color=#557799>█</color>                 <color=#00FF88>█</color>                 <color=#557799>██</color>");
+            sb.AppendLine("   <color=#557799>███</color>               <color=#00FF88>████</color>              <color=#557799>██████</color>");
+            sb.AppendLine("   <color=#557799>███</color>               <color=#00FF88>████</color>              <color=#557799>██████</color>");
+            sb.AppendLine("   <color=#557799>███</color>               <color=#00FF88>████</color>              <color=#557799>██████</color>");
+            sb.AppendLine("                     <color=#00FF88>████</color>              <color=#557799>██████</color>");
+            sb.AppendLine("                                       <color=#557799>██████</color>");
+            sb.AppendLine("<color=#335577>───────────────────────────────────</color>");
+
+            if (t < 6.5f)
+            {
+                bool blink = (Mathf.Sin(Time.time * 6f) > 0);
+                string cursor = blink ? "<color=#00FFCC>▲ TOUCH SELECT: RECIPE 2 (500ml)</color>" : "<color=#335577>▲ TOUCH SELECT: RECIPE 2 (500ml)</color>";
+                sb.AppendLine($"<size=75%><b>{cursor}</b></size>");
+                sb.AppendLine("<size=60%><color=#FFDD55>PRESS TO LOAD 5-PARAMETER RECIPE PROFILE</color></size>");
+            }
+            else
+            {
+                bool pulse = (Mathf.Sin(Time.time * 8f) > 0);
+                string flashCol = pulse ? "#00FF66" : "#00D8FF";
+                sb.AppendLine($"<b><size=85%><color={flashCol}>>>> RECIPE {targetR.name} LOADED <<<</color></size></b>");
+                sb.AppendLine("<size=60%><color=#E0E8F0>AS320T-B PLC REGISTERS D100-D120 SYNC READY</color></size>");
+            }
+
+            textMesh.text = sb.ToString();
+            return;
         }
-        else if (inProgress)
+
+        // =====================================================================
+        // MODE 2: S0B_LoadParameters — 5 Parameters Streaming Into PLC
+        // =====================================================================
+        if (state == ChangeoverSequencer.ChangeoverState.S0B_LoadParameters)
         {
-            sb.Append(" <color=#FFCC00>[>] ").Append(label).Append("...</color>\n");
+            textMesh.fontSize = 0.020f;
+            textMesh.alignment = TextAlignmentOptions.TopLeft;
+
+            sb.AppendLine("<b><color=#00D8FF>DELTA DOP-100WS</color></b> | <color=#00FF88>PARAM BUFFER</color>");
+            sb.AppendLine("<size=70%><color=#8899AA>PLC AS320T-B REGISTERS D100-D120 [MODBUS TCP]</color></size>");
+            sb.AppendLine("<color=#335577>───────────────────────────────────</color>");
+
+            float railGapMm = targetR.railGap * 1000f;
+            float nozzleHtMm = targetR.nozzleClearHeight * 1000f;
+
+            bool p1 = progress >= 0.15f;
+            bool p2 = progress >= 0.35f;
+            bool p3 = progress >= 0.55f;
+            bool p4 = progress >= 0.75f;
+            bool p5 = progress >= 0.92f;
+
+            sb.AppendLine(p1 ? $"<color=#00FF66>[OK] 1. RAIL GAP   (ASD-A3 X) : {railGapMm:F1} mm</color>" : "<color=#445566>[..] 1. RAIL GAP   (ASD-A3 X) : STREAMING...</color>");
+            sb.AppendLine(p2 ? $"<color=#00FF66>[OK] 2. NOZZLE HT  (ASD-A3 Z) : {nozzleHtMm:F1} mm</color>" : "<color=#445566>[..] 2. NOZZLE HT  (ASD-A3 Z) : STREAMING...</color>");
+            sb.AppendLine(p3 ? $"<color=#00FF66>[OK] 3. BELT SPEED (MS300)    : {targetR.beltSpeed:F2} m/s</color>" : "<color=#445566>[..] 3. BELT SPEED (MS300)    : STREAMING...</color>");
+            sb.AppendLine(p4 ? $"<color=#00FF66>[OK] 4. FILL VOL   (PUMP)     : {targetR.fillVolume:F0} ml</color>" : "<color=#445566>[..] 4. FILL VOL   (PUMP)     : STREAMING...</color>");
+            sb.AppendLine(p5 ? $"<color=#00FF66>[OK] 5. FILL TIME  (PROFILE)  : {targetR.fillDuration:F1} s</color>" : "<color=#445566>[..] 5. FILL TIME  (PROFILE)  : STREAMING...</color>");
+
+            sb.AppendLine("<color=#335577>───────────────────────────────────</color>");
+
+            int totalBars = 20;
+            int fillBars = Mathf.Clamp(Mathf.RoundToInt(progress * totalBars), 0, totalBars);
+            string barStr = new string('█', fillBars) + new string('░', totalBars - fillBars);
+            int pct = Mathf.Clamp(Mathf.RoundToInt(progress * 100f), 0, 100);
+
+            sb.AppendLine($"BUFFER: [{barStr}] {pct}%");
+            if (p5)
+            {
+                sb.AppendLine("<color=#00FF88>ALL REGISTERS WRITTEN & VERIFIED [OK]</color>");
+            }
+            else
+            {
+                sb.AppendLine("<color=#FFCC00>BUFFERING RECIPE PARAMETERS INTO AS320T-B...</color>");
+            }
+
+            textMesh.text = sb.ToString();
+            return;
+        }
+
+        // =====================================================================
+        // MODE 3: S1-S10 — Changeover Operational Checklist
+        // =====================================================================
+        textMesh.fontSize = 0.019f;
+        textMesh.alignment = TextAlignmentOptions.TopLeft;
+
+        sb.AppendLine("<b><color=#00D8FF>DELTA DOP-100WS</color></b> | <color=#FFDD55>CHECKLIST</color>");
+        sb.AppendLine($"<size=70%><color=#8899AA>RECIPE: {initialR.name} -> {targetR.name} | STEP: {sequencer.CurrentStateName}</color></size>");
+        sb.AppendLine("<color=#335577>───────────────────────────────────</color>");
+
+        string Check(bool ok, string label) => ok ? $"<color=#00FF88>[OK] {label}</color>" : $"<color=#445566>[..] {label}</color>";
+
+        sb.AppendLine(Check(state >= ChangeoverSequencer.ChangeoverState.S2_CompleteInFlightFill, "1. INFEED STOPPED"));
+        sb.AppendLine(Check(state >= ChangeoverSequencer.ChangeoverState.S4_ClearBottlesFromZone, "2. LAST BOTTLE DISPENSED"));
+        sb.AppendLine(Check(state >= ChangeoverSequencer.ChangeoverState.S6_RetractNozzleToHome,  "3. ZONE CLEARED & BELT STOPPED"));
+        sb.AppendLine(Check(state >= ChangeoverSequencer.ChangeoverState.S7_AdjustRailWidth,      "4. NOZZLE RETRACT TO HOME (1250mm)"));
+        sb.AppendLine(Check(state >= ChangeoverSequencer.ChangeoverState.S8_ConfirmInPosition,    $"5. RAIL GAP ADJUSTED ({targetR.railGap*1000f:F1}mm)"));
+        sb.AppendLine(Check(state >= ChangeoverSequencer.ChangeoverState.S9_FirstArticleCheck,    $"6. VFD SPEED SYNC ({targetR.beltSpeed:F2} m/s)"));
+        sb.AppendLine(Check(state >= ChangeoverSequencer.ChangeoverState.S10_ResumeProduction,   "7. FIRST ARTICLE TEST VERIFIED"));
+
+        sb.AppendLine("<color=#335577>───────────────────────────────────</color>");
+        if (state == ChangeoverSequencer.ChangeoverState.S10_ResumeProduction)
+        {
+            sb.AppendLine("<b><color=#00FF88>>>> PRODUCTION RESUMED @ FULL SPEED <<<</color></b>");
         }
         else
         {
-            sb.Append(" <color=#667788>[ ] ").Append(label).Append("</color>\n");
+            sb.AppendLine($"<color=#00E5FF>EXECUTING: {sequencer.CurrentStateName}</color>");
         }
-    }
 
-    private static string GetProgressBar(float norm, int length)
-    {
-        int filled = Mathf.RoundToInt(norm * length);
-        filled = Mathf.Clamp(filled, 0, length);
-        return $"[<color=#00FF88>{new string('|', filled)}</color><color=#445566>{new string('.', length - filled)}</color>]";
-    }
-
-    private static string GetHumanReadableState(ChangeoverSequencer.ChangeoverState state)
-    {
-        switch (state)
-        {
-            case ChangeoverSequencer.ChangeoverState.S1_StopInfeed:
-                return "S1: Stop Infeed (Admitting Halted)";
-            case ChangeoverSequencer.ChangeoverState.S2_CompleteInFlightFill:
-                return "S2: Complete In-Flight Fill Cycle";
-            case ChangeoverSequencer.ChangeoverState.S3_CloseValveStopPump:
-                return "S3: Close Dispense Valve & Stop Pump";
-            case ChangeoverSequencer.ChangeoverState.S4_ClearBottlesFromZone:
-                return "S4: Evacuate Conveyor Working Zone";
-            case ChangeoverSequencer.ChangeoverState.S5_StopBelt:
-                return "S5: Conveyor Standstill & S-Curve Stop";
-            case ChangeoverSequencer.ChangeoverState.S6_RetractNozzleToHome:
-                return "S6: Retract Z Nozzle to Home Height";
-            case ChangeoverSequencer.ChangeoverState.S7_AdjustRailWidth:
-                return "S7: Adjust X Guide Rails (Servo S-Curve)";
-            case ChangeoverSequencer.ChangeoverState.S8_ConfirmInPosition:
-                return "S8: Verify In-Position & Drive Ready";
-            case ChangeoverSequencer.ChangeoverState.S9_FirstArticleCheck:
-                return "S9: First-Article Test Bottle Fill";
-            case ChangeoverSequencer.ChangeoverState.S10_ResumeProduction:
-                return "S10: Full-Speed Steady Production";
-            default:
-                return state.ToString();
-        }
+        textMesh.text = sb.ToString();
     }
 }
