@@ -337,6 +337,7 @@ public static class RecorderSmokeTest
     private static RenderTexture s_SharedRT;
     private static CameraDirector s_Director;
     private static MotionHighlightController s_MotionHighlight;
+    private static EquipmentIntroSequencer s_EquipmentIntro;
 
     [MenuItem("Tools/Delta/Render B_Changeover MULTICAM (45s, 720p)")]
     public static void RenderChangeoverMulticam()
@@ -380,6 +381,13 @@ public static class RecorderSmokeTest
         {
             s_ShotSwitcher.autoPlayOnStart = false;
             s_ShotSwitcher.Pause();
+        }
+        s_EquipmentIntro = UnityEngine.Object.FindAnyObjectByType<EquipmentIntroSequencer>();
+        if (s_EquipmentIntro != null)
+        {
+            s_EquipmentIntro.autoPlayOnStart = false;
+            s_EquipmentIntro.Pause();
+            s_EquipmentIntro.enabled = false;
         }
         if (s_Director != null) s_Director.autoSwitchOnState = true; // ensure B's own switcher is live
 
@@ -444,6 +452,10 @@ public static class RecorderSmokeTest
         if (s_ShotSwitcher != null)
         {
             s_ShotSwitcher.autoPlayOnStart = true; // restore A-clip switcher's own behaviour
+        }
+        if (s_EquipmentIntro != null)
+        {
+            s_EquipmentIntro.enabled = true;
         }
         if (s_SharedRT != null)
         {
@@ -513,6 +525,14 @@ public static class RecorderSmokeTest
         s_MotionHighlight = UnityEngine.Object.FindAnyObjectByType<MotionHighlightController>();
         if (s_MotionHighlight != null) s_MotionHighlight.enabled = false;
 
+        s_EquipmentIntro = UnityEngine.Object.FindAnyObjectByType<EquipmentIntroSequencer>();
+        if (s_EquipmentIntro != null)
+        {
+            s_EquipmentIntro.autoPlayOnStart = false;
+            s_EquipmentIntro.Pause();
+            s_EquipmentIntro.enabled = false;
+        }
+
         const int width = 1280;
         const int height = 720;
         s_SharedRT = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
@@ -572,6 +592,10 @@ public static class RecorderSmokeTest
         {
             s_MotionHighlight.enabled = true; // restore glow highlight for B_Changeover renders
         }
+        if (s_EquipmentIntro != null)
+        {
+            s_EquipmentIntro.enabled = true;
+        }
         if (s_SharedRT != null)
         {
             s_SharedRT.Release();
@@ -579,5 +603,129 @@ public static class RecorderSmokeTest
             s_SharedRT = null;
         }
         Debug.Log("[RecorderZones] Shared RenderTexture cleaned up, cameras restored to normal rendering.");
+    }
+
+    // ===================================================================================
+    // C_HardwareIntro SEQUENCED RENDER - renders EquipmentIntroSequencer's full 50s
+    // 6-shot storyboard (CabinetWide -> PLC -> HMI -> VFD -> SERVO+Axes -> SystemWide)
+    // with pulsing cyan glow into one file via shared RenderTexture (RenderTextureInputSettings).
+    // ===================================================================================
+    [MenuItem("Tools/Delta/Render C_HardwareIntro (50s, 720p)")]
+    public static void RenderHardwareIntro()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            Debug.Log("[RecorderHardwareIntro] Not in Play Mode - entering Play Mode first.");
+            EditorApplication.playModeStateChanged += OnPlayModeChangedHardwareIntro;
+            EditorApplication.isPlaying = true;
+            return;
+        }
+        StartHardwareIntroRecordingNow();
+    }
+
+    private static void OnPlayModeChangedHardwareIntro(PlayModeStateChange state)
+    {
+        if (state == PlayModeStateChange.EnteredPlayMode)
+        {
+            EditorApplication.playModeStateChanged -= OnPlayModeChangedHardwareIntro;
+            StartHardwareIntroRecordingNow();
+        }
+    }
+
+    private static void StartHardwareIntroRecordingNow()
+    {
+        s_EquipmentIntro = UnityEngine.Object.FindAnyObjectByType<EquipmentIntroSequencer>();
+        if (s_EquipmentIntro == null)
+        {
+            GameObject cell = GameObject.Find("Cell");
+            if (cell != null)
+            {
+                s_EquipmentIntro = cell.AddComponent<EquipmentIntroSequencer>();
+            }
+            else
+            {
+                Debug.LogError("[RecorderHardwareIntro] No Cell GameObject found to attach EquipmentIntroSequencer.");
+                return;
+            }
+        }
+        s_EquipmentIntro.enabled = true;
+
+        s_Director = UnityEngine.Object.FindAnyObjectByType<CameraDirector>();
+        if (s_Director != null) s_Director.autoSwitchOnState = false;
+
+        s_ShotSwitcher = UnityEngine.Object.FindAnyObjectByType<TimedShotSwitcher>();
+        if (s_ShotSwitcher != null)
+        {
+            s_ShotSwitcher.autoPlayOnStart = false;
+            s_ShotSwitcher.Pause();
+        }
+
+        s_MotionHighlight = UnityEngine.Object.FindAnyObjectByType<MotionHighlightController>();
+        if (s_MotionHighlight != null) s_MotionHighlight.enabled = false;
+
+        const int width = 1280;
+        const int height = 720;
+        s_SharedRT = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
+        s_SharedRT.name = "HardwareIntroSharedRT";
+        s_SharedRT.Create();
+
+        s_EquipmentIntro.EnsureCamera();
+        s_EquipmentIntro.SetSharedRenderTexture(s_SharedRT);
+        s_EquipmentIntro.Restart();
+
+        const float durationSeconds = 50f;
+        const float fps = 30f;
+        int totalFrames = Mathf.RoundToInt(durationSeconds * fps);
+
+        var controllerSettings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
+        controllerSettings.SetRecordModeToFrameInterval(0, totalFrames);
+        controllerSettings.FrameRatePlayback = FrameRatePlayback.Constant;
+        controllerSettings.FrameRate = fps;
+        controllerSettings.CapFrameRate = true;
+
+        var movieSettings = ScriptableObject.CreateInstance<MovieRecorderSettings>();
+        movieSettings.name = "CHardwareIntroRecorder";
+        movieSettings.Enabled = true;
+#pragma warning disable CS0618
+        movieSettings.OutputFormat = MovieRecorderSettings.VideoRecorderOutputFormat.MP4;
+        movieSettings.VideoBitRateMode = UnityEditor.VideoBitrateMode.High;
+#pragma warning restore CS0618
+
+        movieSettings.ImageInputSettings = new RenderTextureInputSettings { RenderTexture = s_SharedRT };
+        movieSettings.CaptureAudio = false;
+
+        string projectRoot = Path.GetDirectoryName(Application.dataPath);
+        string outDir = Path.Combine(projectRoot, "Recordings");
+        if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+        string fileBase = "C_HardwareIntro_RAW_v4_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        movieSettings.OutputFile = Path.Combine(outDir, fileBase);
+        LastOutputPath = movieSettings.OutputFile + ".mp4";
+
+        controllerSettings.AddRecorderSettings(movieSettings);
+        s_Controller = new RecorderController(controllerSettings);
+        s_Controller.PrepareRecording();
+        s_Controller.StartRecording();
+
+        Debug.Log("[RecorderHardwareIntro] Started " + durationSeconds + "s hardware-intro render. Expecting output at: " + LastOutputPath);
+    }
+
+    [MenuItem("Tools/Delta/Cleanup Hardware Intro RenderTexture")]
+    public static void CleanupHardwareIntroRenderTexture()
+    {
+        if (s_EquipmentIntro != null)
+        {
+            s_EquipmentIntro.SetSharedRenderTexture(null);
+            s_EquipmentIntro.Pause();
+        }
+        if (s_Director != null) s_Director.autoSwitchOnState = true;
+        if (s_ShotSwitcher != null) s_ShotSwitcher.autoPlayOnStart = true;
+        if (s_MotionHighlight != null) s_MotionHighlight.enabled = true;
+        if (s_SharedRT != null)
+        {
+            s_SharedRT.Release();
+            UnityEngine.Object.DestroyImmediate(s_SharedRT);
+            s_SharedRT = null;
+        }
+        Debug.Log("[RecorderHardwareIntro] Shared RenderTexture cleaned up, cameras restored.");
     }
 }
