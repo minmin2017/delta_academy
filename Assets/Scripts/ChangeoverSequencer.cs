@@ -132,7 +132,12 @@ public class ChangeoverSequencer : MonoBehaviour
     }
 
     /// <summary>
-    /// Current live nozzle height in millimetres, computed from NozzleAssembly_Z world transform position Y.
+    /// Current live nozzle height in millimetres - clearance ABOVE the belt surface (matches the
+    /// real Delta spec sheet's "Nozzle Height" parameter, ~165-240mm depending on recipe), not the
+    /// nozzle's raw world Y. Bug found 2026-09-14 via on-screen readout showing "1123.7 mm" in the
+    /// rendered B_Changeover clip - was returning nozzleAssembly.position.y directly (its absolute
+    /// world-space height, ~1.1m, since the assembly sits high up in the scene), not the clearance
+    /// above BeltSurfaceY that the label and the real spec both mean by "nozzle height".
     /// </summary>
     public float CurrentNozzleHeightMm
     {
@@ -140,9 +145,9 @@ public class ChangeoverSequencer : MonoBehaviour
         {
             if (nozzleAssembly != null)
             {
-                return nozzleAssembly.position.y * 1000f;
+                return (nozzleAssembly.position.y - BeltSurfaceY) * 1000f;
             }
-            return (BeltSurfaceY + currentRecipe.nozzleClearHeight) * 1000f;
+            return currentRecipe.nozzleClearHeight * 1000f;
         }
     }
 

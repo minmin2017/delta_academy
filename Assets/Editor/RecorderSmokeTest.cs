@@ -336,6 +336,7 @@ public static class RecorderSmokeTest
     // ===================================================================================
     private static RenderTexture s_SharedRT;
     private static CameraDirector s_Director;
+    private static MotionHighlightController s_MotionHighlight;
 
     [MenuItem("Tools/Delta/Render B_Changeover MULTICAM (45s, 720p)")]
     public static void RenderChangeoverMulticam()
@@ -503,6 +504,15 @@ public static class RecorderSmokeTest
         s_Director = UnityEngine.Object.FindAnyObjectByType<CameraDirector>();
         if (s_Director != null) s_Director.autoSwitchOnState = false;
 
+        // Same root cause as the CameraDirector fight above: ChangeoverSequencer keeps looping
+        // during this A-clip render regardless of which camera is active, so MotionHighlightController
+        // (glow effect built for B_Changeover's S6/S7/S9) can trigger mid-cycle and bleed its cyan
+        // glow + live mm label into whatever A-clip zone camera happens to be recording at that
+        // moment - confirmed via frame extraction (glow + "NOZZLE HEIGHT" label appeared in the
+        // Filling Zone shot). Disable the whole component for the duration of this render.
+        s_MotionHighlight = UnityEngine.Object.FindAnyObjectByType<MotionHighlightController>();
+        if (s_MotionHighlight != null) s_MotionHighlight.enabled = false;
+
         const int width = 1280;
         const int height = 720;
         s_SharedRT = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
@@ -557,6 +567,10 @@ public static class RecorderSmokeTest
         if (s_Director != null)
         {
             s_Director.autoSwitchOnState = true; // restore B_Changeover's own switching
+        }
+        if (s_MotionHighlight != null)
+        {
+            s_MotionHighlight.enabled = true; // restore glow highlight for B_Changeover renders
         }
         if (s_SharedRT != null)
         {
