@@ -80,19 +80,22 @@ public static class AClipZoneCamerasBuilder
 
         // =========================================================================
         // 3. CAPPING ZONE CAMERA (CappingZoneCam)
-        // Repositioned live via unityMCP after the original side-on angle (1.40,1.45,0.65)
-        // was found to put DeltaControlCabinet directly in the sightline - the cabinet's
-        // world bounds extend to Z=1.33, physically overlapping the capping zone's own
-        // Z=1.05-1.30 range, so any across-the-line viewing angle competed with it for
-        // screen space. An elevated near-overhead 3/4 angle (steep downward pitch) looks
-        // mostly DOWN rather than ACROSS, visually separating the two by floor-plane depth
-        // instead of trying to out-frame the cabinet - verified clean via screenshot.
-        // Target center: (0.00, 1.00, 1.15).
-        // Camera pos: (0.90, 2.30, 1.15), steep downward pitch, elevated overhead angle.
+        // Second repositioning (2026-09-14) - the previous overhead angle (0.90,2.30,1.15)
+        // ->(0.00,1.00,1.15) fixed the DeltaControlCabinet overlap but still visually
+        // overlapped the leftover Filling-zone demo bottle (parked at Z=0.60, belongs to
+        // the B_Changeover nozzle demo, not this zone) with Gantry_VerticalColumn_60x60mm
+        // (X=0.00, Z=0.75-0.81, Y=0.88-1.72) - Min flagged this as the bottle "clipping
+        // through a post" around t=44s of A_LineOverview_ZONES. Real capping equipment
+        // spans Z=0.89 (CapFeeder_Hopper near edge) to Z=1.35 (CappingHead_Chuck far edge).
+        // Fix: moved the camera further downstream (Z 1.15->1.75) and closer/steeper so the
+        // frustum's near side no longer reaches back to the Z=0.6-0.8 column/bottle area -
+        // verified clean via live screenshot (bottle fully isolated on belt, no overlap).
+        // Target center: (0.00, 1.25, 1.05) - centered on CapFeeder_Hopper/CappingHead.
+        // Camera pos: (0.55, 2.10, 1.75), steep downward pitch, elevated overhead angle.
         // =========================================================================
         CreateOrReplaceCamera(root, CappingCamName,
-            new Vector3(0.90f, 2.30f, 1.15f),
-            new Vector3(0.00f, 1.00f, 1.15f),
+            new Vector3(0.55f, 2.10f, 1.75f),
+            new Vector3(0.00f, 1.25f, 1.05f),
             fieldOfView: 40f,
             depth: 82f,
             charcoalBg);
