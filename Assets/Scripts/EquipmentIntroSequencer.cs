@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -111,28 +111,31 @@ public class EquipmentIntroSequencer : MonoBehaviour
                 endLookAt = new Vector3(-0.82f, 1.25f, 1.03f),
                 highlightTargetNames = new string[] { "Delta_DOP_100WS_HMI" }
             },
-            // Shot 3: 23-32s (9s) - VFD MS300
+            // Shot 3: 23-32s (9s) - VFD MS300 -> Conveyor Drive Motor
             new ShotDefinition
             {
                 shotName = "Shot3_VFD_MS300",
                 duration = 9.0f,
                 startPos = new Vector3(-0.10f, 1.20f, 0.80f),
                 startLookAt = new Vector3(-1.22f, 0.85f, 0.26f),
-                endPos = new Vector3(-0.45f, 0.95f, 0.55f),
-                endLookAt = new Vector3(-1.22f, 0.85f, 0.26f),
-                highlightTargetNames = new string[] { "Delta_MS300_VFD" }
+                endPos = new Vector3(0.55f, 1.15f, 1.10f),
+                endLookAt = new Vector3(-0.22f, 0.78f, 1.25f),
+                highlightTargetNames = new string[] {
+                    "Delta_MS300_VFD", "Conveyor_DriveMotor_140x200mm", "Conveyor_Gearbox_120x120x100mm"
+                }
             },
-            // Shot 4: 32-43s (11s) - SERVO ASD-A3 x2 (drives + physical axes)
+            // Shot 4: 32-43s (11s) - SERVO ASD-A3 x2 drives -> ECMA Servo Motors (X & Z)
             new ShotDefinition
             {
                 shotName = "Shot4_SERVO_ASD_A3",
                 duration = 11.0f,
                 startPos = new Vector3(-0.20f, 1.45f, 0.65f),
                 startLookAt = new Vector3(-1.14f, 1.22f, 0.09f),
-                endPos = new Vector3(1.10f, 1.45f, 0.40f),
-                endLookAt = new Vector3(-0.10f, 1.10f, 0.45f),
+                endPos = new Vector3(0.70f, 1.45f, 0.35f),
+                endLookAt = new Vector3(-0.26f, 1.35f, 0.40f),
                 highlightTargetNames = new string[] {
                     "Delta_ASD_A3_X_Rail", "Delta_ASD_A3_Z_Nozzle",
+                    "ServoMotor_GuideRail_X_ECMA", "ServoMotor_Nozzle_Z_ECMA",
                     "GuideRailAssembly_X", "NozzleAssembly_Z"
                 }
             },
@@ -147,7 +150,8 @@ public class EquipmentIntroSequencer : MonoBehaviour
                 endLookAt = new Vector3(-0.20f, 1.10f, 0.50f),
                 highlightTargetNames = new string[] {
                     "Delta_AS320T_B_PLC", "Delta_DOP_100WS_HMI", "Delta_MS300_VFD",
-                    "Delta_ASD_A3_X_Rail", "Delta_ASD_A3_Z_Nozzle"
+                    "Delta_ASD_A3_X_Rail", "Delta_ASD_A3_Z_Nozzle",
+                    "ServoMotor_GuideRail_X_ECMA", "ServoMotor_Nozzle_Z_ECMA"
                 }
             }
         };
@@ -194,6 +198,8 @@ public class EquipmentIntroSequencer : MonoBehaviour
         {
             "Delta_AS320T_B_PLC", "Delta_DOP_100WS_HMI", "Delta_MS300_VFD",
             "Delta_ASD_A3_X_Rail", "Delta_ASD_A3_Z_Nozzle",
+            "Conveyor_DriveMotor_140x200mm", "Conveyor_Gearbox_120x120x100mm",
+            "ServoMotor_GuideRail_X_ECMA", "ServoMotor_Nozzle_Z_ECMA",
             "GuideRailAssembly_X", "NozzleAssembly_Z"
         };
 
@@ -238,6 +244,8 @@ public class EquipmentIntroSequencer : MonoBehaviour
         shotElapsed += Time.deltaTime;
         totalElapsed += Time.deltaTime;
 
+        UpdateCabinetDoorAnimation();
+
         ShotDefinition currentShot = shots[currentShotIndex];
         float progress = Mathf.Clamp01(shotElapsed / currentShot.duration);
         float smoothT = Mathf.SmoothStep(0f, 1f, progress);
@@ -251,15 +259,68 @@ public class EquipmentIntroSequencer : MonoBehaviour
         }
     }
 
+    private void UpdateCabinetDoorAnimation()
+    {
+        GameObject cab = GameObject.Find("DeltaControlCabinet");
+        if (cab == null) return;
+        Transform doorHinge = cab.transform.Find("Cabinet_Door_Hinge");
+        if (doorHinge == null) return;
+
+        if (currentShotIndex == 0)
+        {
+            // Shot 0: Cabinet fully closed and assembled
+            doorHinge.localRotation = Quaternion.identity;
+        }
+        else if (currentShotIndex == 1)
+        {
+            // Shot 1: Door smoothly swings open in first 1.5s
+            float openT = Mathf.Clamp01(shotElapsed / 1.5f);
+            float smoothOpen = Mathf.SmoothStep(0f, 1f, openT);
+            doorHinge.localRotation = Quaternion.Euler(0f, Mathf.Lerp(0f, -85f, smoothOpen), 0f);
+        }
+        else if (currentShotIndex >= 2 && currentShotIndex <= 4)
+        {
+            // Shots 2-4: Door open for direct internal view
+            doorHinge.localRotation = Quaternion.Euler(0f, -85f, 0f);
+        }
+        else if (currentShotIndex == 5)
+        {
+            // Shot 5: Wide close - door smoothly swings back closed in first 2.0s
+            float closeT = Mathf.Clamp01(shotElapsed / 2.0f);
+            float smoothClose = Mathf.SmoothStep(0f, 1f, closeT);
+            doorHinge.localRotation = Quaternion.Euler(0f, Mathf.Lerp(-85f, 0f, smoothClose), 0f);
+        }
+    }
+
     private void UpdateCameraTransform(int shotIdx, float progress, float smoothT)
     {
         if (introCamera == null) return;
 
         ShotDefinition shot = shots[shotIdx];
 
-        if (shotIdx == 4)
+        if (shotIdx == 3)
         {
-            // Shot 4: 0-5s drives in cabinet, 5-11s cut to physical axes
+            // Shot 3: 0-4.5s VFD in cabinet, 4.5-9s cut/pan to Conveyor Drive Motor on machine
+            if (shotElapsed < 4.5f)
+            {
+                float subT = Mathf.SmoothStep(0f, 1f, shotElapsed / 4.5f);
+                Vector3 p = Vector3.Lerp(new Vector3(-0.10f, 1.20f, 0.80f), new Vector3(-0.55f, 0.95f, 0.50f), subT);
+                Vector3 look = new Vector3(-1.22f, 0.85f, 0.26f);
+                introCamera.transform.position = p;
+                introCamera.transform.rotation = Quaternion.LookRotation((look - p).normalized, Vector3.up);
+            }
+            else
+            {
+                float subT = Mathf.SmoothStep(0f, 1f, (shotElapsed - 4.5f) / 4.5f);
+                Vector3 p = Vector3.Lerp(new Vector3(0.30f, 1.15f, 0.85f), new Vector3(0.55f, 1.15f, 1.10f), subT);
+                Vector3 look = new Vector3(-0.22f, 0.78f, 1.25f);
+                introCamera.transform.position = p;
+                introCamera.transform.rotation = Quaternion.LookRotation((look - p).normalized, Vector3.up);
+            }
+        }
+        else if (shotIdx == 4)
+        {
+            // Shot 4: 0-5s ASD-A3 drives in cabinet, 5-11s cut/pan to physical Servo Motors on machine
             if (shotElapsed < 5.0f)
             {
                 float subT = Mathf.SmoothStep(0f, 1f, shotElapsed / 5.0f);
@@ -271,8 +332,8 @@ public class EquipmentIntroSequencer : MonoBehaviour
             else
             {
                 float subT = Mathf.SmoothStep(0f, 1f, (shotElapsed - 5.0f) / 6.0f);
-                Vector3 p = Vector3.Lerp(new Vector3(1.30f, 1.55f, 0.35f), new Vector3(1.05f, 1.40f, 0.45f), subT);
-                Vector3 look = new Vector3(-0.10f, 1.10f, 0.45f);
+                Vector3 p = Vector3.Lerp(new Vector3(0.95f, 1.55f, 0.35f), new Vector3(0.70f, 1.45f, 0.35f), subT);
+                Vector3 look = new Vector3(-0.26f, 1.35f, 0.40f);
                 introCamera.transform.position = p;
                 introCamera.transform.rotation = Quaternion.LookRotation((look - p).normalized, Vector3.up);
             }
