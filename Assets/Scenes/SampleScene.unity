@@ -5502,6 +5502,7 @@ GameObject:
   - component: {fileID: 331267445}
   - component: {fileID: 331267444}
   - component: {fileID: 331267443}
+  - component: {fileID: 331267447}
   m_Layer: 0
   m_Name: Cell
   m_TagString: Untagged
@@ -5634,6 +5635,21 @@ Transform:
   - {fileID: 1108041811}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &331267447
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 331267442}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40c457ba05b31da40a021217343a8845, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MotionHighlightController
+  sequencer: {fileID: 331267445}
+  guideRailAssembly: {fileID: 1082501486}
+  nozzleAssembly: {fileID: 1520241575}
 --- !u!1 &336315538
 GameObject:
   m_ObjectHideFlags: 0

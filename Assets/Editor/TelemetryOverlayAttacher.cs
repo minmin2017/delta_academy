@@ -82,6 +82,54 @@ public static class TelemetryOverlayAttacher
         controller.ValidateAndCacheReferences();
         EditorUtility.SetDirty(targetObj);
 
-        Debug.Log($"[TelemetryOverlayAttacher] TelemetryOverlayController attached to '{targetObj.name}' and references wired successfully.");
+        Debug.Log($"[TelemetryOverlayAttacher] TelemetryOverlayController attached to '{targetObj.name}' and references wired successfully. NOTE: this uses a Screen Space - Overlay canvas which is NOT captured by the RenderTexture-based Recorder pipeline - use 'Attach Motion Highlights' below for a render-safe version.");
+    }
+
+    /// <summary>
+    /// Min's feedback (2026-09-14): rail/nozzle motion is too subtle to notice in a locked wide
+    /// shot; wants a highlight/hologram effect. MotionHighlightController does this with a
+    /// pulsing emissive glow + world-space live mm readout - unlike TelemetryOverlayController
+    /// above (Screen Space - Overlay), this one IS captured by the Recorder pipeline because it
+    /// uses world-space TextMeshPro, the same pattern already proven in every render this
+    /// session (ZoneLabelsBuilder, CappingZoneBuilder).
+    /// </summary>
+    [MenuItem("Tools/Delta/Attach Motion Highlights")]
+    public static void AttachMotionHighlights()
+    {
+        ChangeoverSequencer sequencer = Object.FindAnyObjectByType<ChangeoverSequencer>();
+        GameObject targetObj = (sequencer != null) ? sequencer.gameObject : GameObject.Find(RootName);
+        if (targetObj == null)
+        {
+            Debug.LogError($"[TelemetryOverlayAttacher] Neither ChangeoverSequencer nor '{RootName}' found in scene! Run Tools/Delta/Build Full Line first.");
+            return;
+        }
+
+        MotionHighlightController controller = targetObj.GetComponent<MotionHighlightController>();
+        if (controller == null)
+        {
+            controller = Undo.AddComponent<MotionHighlightController>(targetObj);
+        }
+
+        controller.sequencer = sequencer;
+        if (sequencer != null)
+        {
+            if (sequencer.guideRailAssembly != null) controller.guideRailAssembly = sequencer.guideRailAssembly;
+            if (sequencer.nozzleAssembly != null) controller.nozzleAssembly = sequencer.nozzleAssembly;
+        }
+        if (controller.guideRailAssembly == null)
+        {
+            GameObject railObj = GameObject.Find("GuideRailAssembly_X");
+            if (railObj != null) controller.guideRailAssembly = railObj.transform;
+        }
+        if (controller.nozzleAssembly == null)
+        {
+            GameObject nozzleObj = GameObject.Find("NozzleAssembly_Z");
+            if (nozzleObj != null) controller.nozzleAssembly = nozzleObj.transform;
+        }
+
+        controller.ValidateAndCacheReferences();
+        EditorUtility.SetDirty(targetObj);
+
+        Debug.Log($"[TelemetryOverlayAttacher] MotionHighlightController attached to '{targetObj.name}' - pulsing glow + live mm readout on rail (S7) and nozzle (S6-S9), render-safe (world-space, not Screen Space Overlay).");
     }
 }
