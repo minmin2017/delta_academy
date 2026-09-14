@@ -45,3 +45,6 @@ desktop.ini
 
 # Large reference PDF datasheets (keep lightweight repo; links in _reference/README.md)
 _reference/*.pdf
+
+# Ignore local generated video renders
+/[Rr]ecordings/

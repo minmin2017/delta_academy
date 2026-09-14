@@ -51,13 +51,20 @@ public static class DeltaControlPropsBuilder
         Material stainlessMat = DeltaMaterials.BrushedStainless();
         Material ductMat = DeltaMaterials.PaintedSteel(new Color(0.48f, 0.50f, 0.53f, 1f));
 
+        Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
+
+        Material glassMat = new Material(urpLit) { name = "M_Acrylic_Glass" };
+        glassMat.SetFloat("_Surface", 1.0f); // Transparent
+        glassMat.SetColor("_BaseColor", new Color(0.8f, 0.9f, 1.0f, 0.3f));
+        glassMat.SetFloat("_Smoothness", 0.95f);
+        glassMat.renderQueue = 3000;
+
         Material deviceDark = DeltaMaterials.PaintedSteel(new Color(0.14f, 0.15f, 0.16f, 1f));
         Material deviceCharcoal = DeltaMaterials.PaintedSteel(new Color(0.18f, 0.19f, 0.21f, 1f));
         Material terminalGreen = DeltaMaterials.PaintedSteel(new Color(0.12f, 0.38f, 0.22f, 1f));
         Material psuMetal = DeltaMaterials.PaintedSteel(new Color(0.62f, 0.64f, 0.67f, 1f));
 
         // Emissive LED materials (ShadowCastingMode.Off ensures GPU Resident Drawer SHADOWCASTER pass ignores them)
-        Shader urpLit = Shader.Find("Universal Render Pipeline/Lit");
         Material ledGreen = new Material(urpLit) { name = "M_LED_Green" };
         ledGreen.SetColor("_BaseColor", new Color(0.2f, 1.0f, 0.3f, 1f));
         ledGreen.EnableKeyword("_EMISSION");
@@ -119,6 +126,7 @@ public static class DeltaControlPropsBuilder
         topRoof.transform.localScale = new Vector3(1.00f, 0.02f, 0.45f);
         topRoof.GetComponent<Renderer>().sharedMaterial = frameSteel;
 
+
         // Left Side Wall
         GameObject leftWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
         leftWall.name = "Cabinet_SideWall_Left";
@@ -127,6 +135,14 @@ public static class DeltaControlPropsBuilder
         leftWall.transform.localScale = new Vector3(0.02f, 1.70f, 0.45f);
         leftWall.GetComponent<Renderer>().sharedMaterial = frameSteel;
 
+        // Vents on Left Wall
+        GameObject ventL = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        ventL.name = "Vent_Left";
+        ventL.transform.SetParent(cabinetObj.transform);
+        ventL.transform.localPosition = new Vector3(-0.495f, -0.5f, 0f);
+        ventL.transform.localScale = new Vector3(0.015f, 0.3f, 0.25f);
+        ventL.GetComponent<Renderer>().sharedMaterial = deviceCharcoal;
+
         // Right Side Wall
         GameObject rightWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
         rightWall.name = "Cabinet_SideWall_Right";
@@ -134,6 +150,15 @@ public static class DeltaControlPropsBuilder
         rightWall.transform.localPosition = new Vector3(0.49f, 0.05f, 0f);
         rightWall.transform.localScale = new Vector3(0.02f, 1.70f, 0.45f);
         rightWall.GetComponent<Renderer>().sharedMaterial = frameSteel;
+
+        // Vents on Right Wall
+        GameObject ventR = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        ventR.name = "Vent_Right";
+        ventR.transform.SetParent(cabinetObj.transform);
+        ventR.transform.localPosition = new Vector3(0.495f, -0.5f, 0f);
+        ventR.transform.localScale = new Vector3(0.015f, 0.3f, 0.25f);
+        ventR.GetComponent<Renderer>().sharedMaterial = deviceCharcoal;
+
 
         // Internal Mounting Subpanel (Galvanized steel backplate)
         GameObject subpanel = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -144,10 +169,6 @@ public static class DeltaControlPropsBuilder
         subpanel.GetComponent<Renderer>().sharedMaterial = backpanelMat;
 
         // Cabinet Top Banner Label
-        CreateWorldLabel(cabinetObj.transform, "Label_CabinetHeader",
-            new Vector3(0f, 0.84f, 0.15f), Vector3.zero,
-            "<b><color=#00D8FF>DELTA</color> INDUSTRIAL AUTOMATION</b> | RECIPE CONTROL SYSTEM",
-            0.045f, Color.white, TextAlignmentOptions.Center, new Vector2(0.95f, 0.06f), fontAsset);
 
         // =========================================================================
         // DIN RAILS & WIREWAY DUCTS
@@ -204,10 +225,6 @@ public static class DeltaControlPropsBuilder
         psuLedRend.shadowCastingMode = ShadowCastingMode.Off;
         psuLedRend.receiveShadows = false;
 
-        CreateWorldLabel(cabinetObj.transform, "Label_CliQ_M",
-            new Vector3(-0.30f, 0.41f, -0.05f), Vector3.zero,
-            "<b>CliQ-M</b>\n<color=#AACCFF>24 VDC</color>",
-            0.034f, Color.white, TextAlignmentOptions.Center, new Vector2(0.10f, 0.05f), fontAsset);
 
         // 2. AS320T-B PLC: 0.088 W x 0.088 H x 0.095 D m
         GameObject plc = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -248,10 +265,6 @@ public static class DeltaControlPropsBuilder
             ledRend.receiveShadows = false;
         }
 
-        CreateWorldLabel(cabinetObj.transform, "Label_AS320T",
-            new Vector3(-0.16f, 0.41f, -0.06f), Vector3.zero,
-            "<b>AS320T-B</b>\n<color=#AACCFF>PLC</color>",
-            0.034f, Color.white, TextAlignmentOptions.Center, new Vector2(0.12f, 0.05f), fontAsset);
 
         // 3. ASD-A3 AC Servo Drive X (GUIDE RAIL): 0.040 W x 0.150 H x 0.163 D m
         GameObject servoX = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -272,10 +285,6 @@ public static class DeltaControlPropsBuilder
         sxRend.shadowCastingMode = ShadowCastingMode.Off;
         sxRend.receiveShadows = false;
 
-        CreateWorldLabel(cabinetObj.transform, "Label_ServoX",
-            new Vector3(-0.02f, 0.43f, -0.01f), Vector3.zero,
-            "<b>ASD-A3</b>\n<color=#00FF66>X — RAIL</color>",
-            0.030f, Color.white, TextAlignmentOptions.Center, new Vector2(0.12f, 0.05f), fontAsset);
 
         // 4. ASD-A3 AC Servo Drive Z (NOZZLE): 0.040 W x 0.150 H x 0.163 D m
         GameObject servoZ = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -296,10 +305,6 @@ public static class DeltaControlPropsBuilder
         szRend.shadowCastingMode = ShadowCastingMode.Off;
         szRend.receiveShadows = false;
 
-        CreateWorldLabel(cabinetObj.transform, "Label_ServoZ",
-            new Vector3(0.08f, 0.43f, -0.01f), Vector3.zero,
-            "<b>ASD-A3</b>\n<color=#00FF66>Z — NOZZLE</color>",
-            0.030f, Color.white, TextAlignmentOptions.Center, new Vector2(0.14f, 0.05f), fontAsset);
 
         // =========================================================================
         // ROW 2: VFD BELOW (MOUNTED DIRECTLY UNDER PLC ON LOWER DIN RAIL)
@@ -333,10 +338,6 @@ public static class DeltaControlPropsBuilder
         vfdKnob.transform.localScale = new Vector3(0.24f, 0.08f, 0.24f);
         vfdKnob.GetComponent<Renderer>().sharedMaterial = plinthMat;
 
-        CreateWorldLabel(cabinetObj.transform, "Label_MS300",
-            new Vector3(-0.16f, 0.04f, -0.05f), Vector3.zero,
-            "<b>MS300</b>\n<color=#FFCC00>CONVEYOR</color>",
-            0.032f, Color.white, TextAlignmentOptions.Center, new Vector2(0.12f, 0.05f), fontAsset);
 
         // Lower Terminal Blocks along Row 2
         GameObject termStrip = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -357,13 +358,50 @@ public static class DeltaControlPropsBuilder
         doorHinge.transform.localPosition = new Vector3(-0.48f, 0.05f, 0.220f);
         doorHinge.transform.localRotation = Quaternion.Euler(0f, -130f, 0f);
 
-        // Door Panel Slab (0.76 W x 1.65 H x 0.025 D m)
-        GameObject doorPanel = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        doorPanel.name = "Cabinet_Door_Panel";
-        doorPanel.transform.SetParent(doorHinge.transform);
-        doorPanel.transform.localPosition = new Vector3(0.38f, 0f, 0f);
-        doorPanel.transform.localScale = new Vector3(0.76f, 1.65f, 0.025f);
-        doorPanel.GetComponent<Renderer>().sharedMaterial = frameSteel;
+        // Detailed Door Panel with Acrylic Window
+        GameObject doorRoot = new GameObject("Cabinet_Door_Root");
+        doorRoot.transform.SetParent(doorHinge.transform);
+        doorRoot.transform.localPosition = new Vector3(0.38f, 0f, 0f);
+
+        // Frame Top (0.76 W x 0.35 H)
+        GameObject doorTop = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        doorTop.name = "Door_Top";
+        doorTop.transform.SetParent(doorRoot.transform);
+        doorTop.transform.localPosition = new Vector3(0f, 0.65f, 0f);
+        doorTop.transform.localScale = new Vector3(0.76f, 0.35f, 0.025f);
+        doorTop.GetComponent<Renderer>().sharedMaterial = frameSteel;
+
+        // Frame Bottom (0.76 W x 0.30 H)
+        GameObject doorBottom = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        doorBottom.name = "Door_Bottom";
+        doorBottom.transform.SetParent(doorRoot.transform);
+        doorBottom.transform.localPosition = new Vector3(0f, -0.675f, 0f);
+        doorBottom.transform.localScale = new Vector3(0.76f, 0.30f, 0.025f);
+        doorBottom.GetComponent<Renderer>().sharedMaterial = frameSteel;
+
+        // Frame Left (0.15 W x 1.00 H)
+        GameObject doorLeft = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        doorLeft.name = "Door_Left";
+        doorLeft.transform.SetParent(doorRoot.transform);
+        doorLeft.transform.localPosition = new Vector3(-0.305f, -0.025f, 0f);
+        doorLeft.transform.localScale = new Vector3(0.15f, 1.00f, 0.025f);
+        doorLeft.GetComponent<Renderer>().sharedMaterial = frameSteel;
+
+        // Frame Right (0.15 W x 1.00 H)
+        GameObject doorRight = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        doorRight.name = "Door_Right";
+        doorRight.transform.SetParent(doorRoot.transform);
+        doorRight.transform.localPosition = new Vector3(0.305f, -0.025f, 0f);
+        doorRight.transform.localScale = new Vector3(0.15f, 1.00f, 0.025f);
+        doorRight.GetComponent<Renderer>().sharedMaterial = frameSteel;
+
+        // Acrylic Glass Window (0.46 W x 1.00 H)
+        GameObject doorGlass = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        doorGlass.name = "Door_Acrylic_Glass";
+        doorGlass.transform.SetParent(doorRoot.transform);
+        doorGlass.transform.localPosition = new Vector3(0f, -0.025f, 0f);
+        doorGlass.transform.localScale = new Vector3(0.46f, 1.00f, 0.01f);
+        doorGlass.GetComponent<Renderer>().sharedMaterial = glassMat;
 
         // Door Perimeter Bevel Trim / Handle
         GameObject doorHandle = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -393,10 +431,6 @@ public static class DeltaControlPropsBuilder
         screenRend.receiveShadows = false;
 
         // Lower Bezel Delta Label
-        CreateWorldLabel(hmiBody.transform, "Label_DeltaLogo",
-            new Vector3(0f, -0.42f, 0.52f), Vector3.zero,
-            "<size=120%><b><color=#00D8FF>DELTA</color></b></size>  DOP-100WS",
-            0.022f, Color.white, TextAlignmentOptions.Center, new Vector2(0.13f, 0.025f), fontAsset);
 
         // Runtime HMI Display TextMeshPro
         GameObject hmiTextObj = new GameObject("HMI_Display_TextMeshPro");
@@ -601,33 +635,4 @@ public static class DeltaControlPropsBuilder
         Debug.Log("[DeltaControlPropsBuilder] Build Full Cell completed: Verified Cell + Control Props + Sequencer + Camera Director + Reflection Probe baked.");
     }
 
-    private static TextMeshPro CreateWorldLabel(Transform parent, string name, Vector3 localPos, Vector3 localRot,
-        string text, float fontSize, Color color, TextAlignmentOptions align, Vector2 size, TMP_FontAsset font)
-    {
-        GameObject go = new GameObject(name);
-        go.transform.SetParent(parent);
-        go.transform.localPosition = localPos;
-        go.transform.localRotation = Quaternion.Euler(localRot);
-
-        TextMeshPro tmp = go.AddComponent<TextMeshPro>();
-        if (font != null)
-        {
-            tmp.font = font;
-        }
-        tmp.text = text;
-        tmp.fontSize = fontSize;
-        tmp.color = color;
-        tmp.alignment = align;
-        tmp.rectTransform.sizeDelta = size;
-
-        // Explicitly set ShadowCastingMode.Off on TMP mesh renderers to avoid GPU Resident Drawer SHADOWCASTER pass registration
-        MeshRenderer mr = go.GetComponent<MeshRenderer>();
-        if (mr != null)
-        {
-            mr.shadowCastingMode = ShadowCastingMode.Off;
-            mr.receiveShadows = false;
-        }
-
-        return tmp;
-    }
 }

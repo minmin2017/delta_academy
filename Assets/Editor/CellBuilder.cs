@@ -343,58 +343,62 @@ public static class CellBuilder
         GameObject gantryRoot = new GameObject("FillingGantry_Stationary");
         gantryRoot.transform.SetParent(conveyorRoot.transform);
 
+        // Moved column to X = -0.28m (outside the belt) and slimmed to 40x40mm
         GameObject gantryColumn = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        gantryColumn.name = "Gantry_VerticalColumn_60x60mm";
+        gantryColumn.name = "Gantry_VerticalColumn_40x40mm";
         gantryColumn.transform.SetParent(gantryRoot.transform);
-        gantryColumn.transform.position = new Vector3(0f, 1.30f, 0.78f);
-        gantryColumn.transform.localScale = new Vector3(0.06f, 0.84f, 0.06f);
+        gantryColumn.transform.position = new Vector3(-0.28f, 1.30f, 0.78f);
+        gantryColumn.transform.localScale = new Vector3(0.04f, 0.84f, 0.04f);
         gantryColumn.GetComponent<Renderer>().sharedMaterial = frameMat;
 
         GameObject gantryLinearRail = GameObject.CreatePrimitive(PrimitiveType.Cube);
         gantryLinearRail.name = "Gantry_LinearRail_Stainless";
         gantryLinearRail.transform.SetParent(gantryRoot.transform);
-        gantryLinearRail.transform.position = new Vector3(0f, 1.30f, 0.745f);
+        gantryLinearRail.transform.position = new Vector3(-0.28f, 1.30f, 0.755f);
         gantryLinearRail.transform.localScale = new Vector3(0.02f, 0.80f, 0.01f);
         gantryLinearRail.GetComponent<Renderer>().sharedMaterial = stainlessMat;
 
+        // Assembly root moves to the rail X location
         GameObject nozzleAssemblyRoot = new GameObject("NozzleAssembly_Z");
         nozzleAssemblyRoot.transform.SetParent(conveyorRoot.transform);
-        nozzleAssemblyRoot.transform.position = new Vector3(0f, 1.15f, 0.60f);
+        nozzleAssemblyRoot.transform.position = new Vector3(-0.28f, 1.15f, 0.60f);
 
+        // The carriage arm extends from X=0 (at the rail) to X=+0.28 (center of belt)
+        GameObject carriageArm = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        carriageArm.name = "Nozzle_CarriageArm";
+        carriageArm.transform.SetParent(nozzleAssemblyRoot.transform);
+        carriageArm.transform.localPosition = new Vector3(0.14f, 0.28f, 0.14f); // Midpoint of extension
+        carriageArm.transform.localScale = new Vector3(0.28f, 0.04f, 0.04f);
+        carriageArm.GetComponent<Renderer>().sharedMaterial = stainlessMat;
+
+        GameObject slideBlock = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        slideBlock.name = "Nozzle_LinearSlideBlock";
+        slideBlock.transform.SetParent(nozzleAssemblyRoot.transform);
+        slideBlock.transform.localPosition = new Vector3(0f, 0.28f, 0.15f);
+        slideBlock.transform.localScale = new Vector3(0.05f, 0.08f, 0.03f);
+        slideBlock.GetComponent<Renderer>().sharedMaterial = stainlessMat;
+
+        // All nozzle components are shifted by X=+0.28m to center over the belt
         GameObject nozzleTip = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         nozzleTip.name = "Nozzle_DispenseTip_Stainless";
         nozzleTip.transform.SetParent(nozzleAssemblyRoot.transform);
-        nozzleTip.transform.localPosition = new Vector3(0f, 0.015f, 0f);
+        nozzleTip.transform.localPosition = new Vector3(0.28f, 0.015f, 0f);
         nozzleTip.transform.localScale = new Vector3(0.014f, 0.015f, 0.014f);
         nozzleTip.GetComponent<Renderer>().sharedMaterial = stainlessMat;
 
         GameObject nozzleTube = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         nozzleTube.name = "Nozzle_FeedTube_Stainless";
         nozzleTube.transform.SetParent(nozzleAssemblyRoot.transform);
-        nozzleTube.transform.localPosition = new Vector3(0f, 0.13f, 0f);
+        nozzleTube.transform.localPosition = new Vector3(0.28f, 0.13f, 0f);
         nozzleTube.transform.localScale = new Vector3(0.020f, 0.10f, 0.020f);
         nozzleTube.GetComponent<Renderer>().sharedMaterial = stainlessMat;
 
         GameObject valveBlock = GameObject.CreatePrimitive(PrimitiveType.Cube);
         valveBlock.name = "Filling_ValveBlock_Stainless";
         valveBlock.transform.SetParent(nozzleAssemblyRoot.transform);
-        valveBlock.transform.localPosition = new Vector3(0f, 0.28f, 0f);
+        valveBlock.transform.localPosition = new Vector3(0.28f, 0.28f, 0f);
         valveBlock.transform.localScale = new Vector3(0.08f, 0.10f, 0.08f);
         valveBlock.GetComponent<Renderer>().sharedMaterial = stainlessMat;
-
-        GameObject carriageArm = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        carriageArm.name = "Nozzle_CarriageArm";
-        carriageArm.transform.SetParent(nozzleAssemblyRoot.transform);
-        carriageArm.transform.localPosition = new Vector3(0f, 0.28f, 0.07f);
-        carriageArm.transform.localScale = new Vector3(0.04f, 0.04f, 0.06f);
-        carriageArm.GetComponent<Renderer>().sharedMaterial = stainlessMat;
-
-        GameObject slideBlock = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        slideBlock.name = "Nozzle_LinearSlideBlock";
-        slideBlock.transform.SetParent(nozzleAssemblyRoot.transform);
-        slideBlock.transform.localPosition = new Vector3(0f, 0.28f, 0.14f);
-        slideBlock.transform.localScale = new Vector3(0.05f, 0.08f, 0.03f);
-        slideBlock.GetComponent<Renderer>().sharedMaterial = stainlessMat;
 
         // =========================================================================
         // 7. 500 ML PET BOTTLE ON BELT UPSTREAM
