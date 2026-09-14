@@ -5,9 +5,14 @@ using UnityEngine;
 /// State-driven camera switcher for KMITL Delta Academy changeover demonstration.
 /// Observes ChangeoverSequencer state transitions and activates locked-angle cameras
 /// corresponding to key phases of the changeover sequence:
-/// - S6 Retract Nozzle To Home -> NozzleSideCam (side profile of Z-axis gantry and nozzle retract)
+/// - S2 Complete In Flight Fill -> NozzleSideCam (side profile of dive-filling in progress)
+/// - S3 Close Valve Stop Pump -> NozzleSideCam (nozzle retract to recipe-clear height)
+/// - S6 Retract Nozzle To Home -> NozzleSideCam (side profile of Z-axis gantry and nozzle retract to home)
 /// - S7 Adjust Rail Width -> RailTopCam (top-down view of X-axis guide rail widening)
-/// - S1-S5, S8-S10 -> CellCam_Hero (default hero machine view)
+/// - S8 Confirm In Position -> ControlCam_Close (HMI status verification)
+/// - S9 First Article Check -> NozzleSideCam (side profile of test bottle dive fill & retract)
+/// - S1 -> ControlCam_Close (HMI recipe request)
+/// - S4, S5, S10 -> CellCam_Hero (default hero machine view)
 /// </summary>
 public class CameraDirector : MonoBehaviour
 {
@@ -138,7 +143,10 @@ public class CameraDirector : MonoBehaviour
                 // CameraDirector but never actually used in this switch until now.
                 return (controlCamClose != null) ? controlCamClose : heroCam;
 
+            case ChangeoverSequencer.ChangeoverState.S2_CompleteInFlightFill:
+            case ChangeoverSequencer.ChangeoverState.S3_CloseValveStopPump:
             case ChangeoverSequencer.ChangeoverState.S6_RetractNozzleToHome:
+            case ChangeoverSequencer.ChangeoverState.S9_FirstArticleCheck:
                 return (nozzleSideCam != null) ? nozzleSideCam : heroCam;
 
             case ChangeoverSequencer.ChangeoverState.S7_AdjustRailWidth:
@@ -149,11 +157,8 @@ public class CameraDirector : MonoBehaviour
                 // checklist ticks are most legible on the close-up, same reasoning as S1.
                 return (controlCamClose != null) ? controlCamClose : heroCam;
 
-            case ChangeoverSequencer.ChangeoverState.S2_CompleteInFlightFill:
-            case ChangeoverSequencer.ChangeoverState.S3_CloseValveStopPump:
             case ChangeoverSequencer.ChangeoverState.S4_ClearBottlesFromZone:
             case ChangeoverSequencer.ChangeoverState.S5_StopBelt:
-            case ChangeoverSequencer.ChangeoverState.S9_FirstArticleCheck:
             case ChangeoverSequencer.ChangeoverState.S10_ResumeProduction:
             default:
                 return (heroCam != null) ? heroCam : null;

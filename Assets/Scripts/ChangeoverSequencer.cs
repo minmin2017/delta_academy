@@ -169,6 +169,10 @@ public class ChangeoverSequencer : MonoBehaviour
     private const float InfeedSpawnZ = -1.40f;
     private const float OutfeedExitZ = 1.55f;
 
+    // Physical dive-filling constants (meters)
+    private const float DiveStartAboveBelt = 0.025f; // 25 mm above conveyor belt surface (near bottle bottom)
+    private const float SubmergedOffset = 0.010f;    // 10 mm below rising liquid surface during dispensing
+
     // Rail child transforms
     private Transform railLeft;
     private Transform railRight;
@@ -179,6 +183,10 @@ public class ChangeoverSequencer : MonoBehaviour
     private float currentBeltSpeed = 0f;
     private float beltUvOffset = 0f;
     private bool s6CompleteConfirmed = false;
+
+    // S2 timing sub-phases (in-flight bottle dive & fill completion)
+    private float s2_tDive = 1.0f;
+    private float s2_tFill = 1.5f;
 
     // S9 timing sub-phases (derived dynamically from distance and recipe speed)
     private float s9_tTravel = 0f;
@@ -319,7 +327,7 @@ public class ChangeoverSequencer : MonoBehaviour
 
         // Apply initial geometry from recipe table
         SetRailGap(currentRecipe.railGap);
-        SetNozzleWorldY(BeltSurfaceY + currentRecipe.nozzleClearHeight);
+        SetNozzleWorldY(GetRecipeClearY(currentRecipe));
         currentBeltSpeed = currentRecipe.beltSpeed;
 
         // Adopt initial scene bottle if present
@@ -386,11 +394,14 @@ public class ChangeoverSequencer : MonoBehaviour
                 float s1Dist = Mathf.Max(0.01f, FillStationZ - InitialBottleStartZ);
                 stateDuration = s1Dist / Mathf.Max(0.05f, currentRecipe.beltSpeed);
                 currentBeltSpeed = currentRecipe.beltSpeed;
+                SetNozzleWorldY(GetRecipeClearY(currentRecipe));
                 break;
 
             case ChangeoverState.S2_CompleteInFlightFill:
-                // Conveyor stops while completing in-flight bottle fill
-                stateDuration = currentRecipe.fillDuration;
+                // Conveyor stops while completing in-flight bottle fill with true dive-filling motion
+                s2_tDive = 1.0f;
+                s2_tFill = Mathf.Max(1.5f, currentRecipe.fillDuration * 0.60f);
+                stateDuration = s2_tDive + s2_tFill;
                 currentBeltSpeed = 0f;
                 if (inFlightBottle != null)
                 {
@@ -399,29 +410,33 @@ public class ChangeoverSequencer : MonoBehaviour
                 break;
 
             case ChangeoverState.S3_CloseValveStopPump:
-                // Close valve, stop pump dwell
-                stateDuration = 0.8f;
+                // Close valve, stop pump dwell, and visibly retract nozzle from dive height to recipe-clear height
+                stateDuration = 1.2f;
                 currentBeltSpeed = 0f;
                 if (inFlightBottle != null)
                 {
+                    inFlightBottle.transform.position = new Vector3(0f, BeltSurfaceY, FillStationZ);
                     inFlightBottle.SetFill(1.0f);
                     inFlightBottle.isFilled = true;
                 }
                 break;
 
             case ChangeoverState.S4_ClearBottlesFromZone:
-                // Run belt to clear in-flight bottle past downstream collision zone
+                // Run belt to clear in-flight bottle past downstream collision zone.
+                // Safety invariant: nozzle is verified at recipe-clear height before conveyor movement.
                 stateDuration = 3.5f;
                 currentBeltSpeed = currentRecipe.beltSpeed;
+                SetNozzleWorldY(GetRecipeClearY(currentRecipe));
                 break;
 
             case ChangeoverState.S5_StopBelt:
-                // Decelerate belt to zero
+                // Decelerate belt to zero; enforce nozzle at recipe-clear height
                 stateDuration = 0.8f;
+                SetNozzleWorldY(GetRecipeClearY(currentRecipe));
                 break;
 
             case ChangeoverState.S6_RetractNozzleToHome:
-                // Z axis servo returns to Home height (1.25m) FIRST. Rails remain locked.
+                // Z axis servo returns from recipe-clear height to Home height (1.25m) FIRST. Rails remain locked.
                 stateDuration = 2.5f;
                 currentBeltSpeed = 0f;
                 s6CompleteConfirmed = false;
@@ -496,33 +511,58 @@ public class ChangeoverSequencer : MonoBehaviour
         {
             case ChangeoverState.S1_StopInfeed:
                 // In-flight bottle advances ONLY via UpdateBottlePositions at currentRecipe.beltSpeed
+                SetNozzleWorldY(GetRecipeClearY(currentRecipe));
                 break;
 
             case ChangeoverState.S2_CompleteInFlightFill:
-                // Scale in-flight liquid cylinder up to full (grows strictly from base)
+                // Stopped in-flight bottle receives nozzle down from recipe-clear, then completes fill 40% -> 100% as nozzle rises with liquid
+                currentBeltSpeed = 0f;
                 if (inFlightBottle != null)
                 {
-                    float fill = Mathf.Lerp(0.40f, 1.0f, eased);
-                    inFlightBottle.SetFill(fill);
+                    inFlightBottle.transform.position = new Vector3(0f, BeltSurfaceY, FillStationZ);
+                    float clearY = GetRecipeClearY(currentRecipe);
+                    float dive40Y = GetDiveFollowY(currentRecipe, 0.40f);
+
+                    if (stateTimer < s2_tDive)
+                    {
+                        // Sub-phase 1: Nozzle servo lowers from recipe-clear height into bottle down to initial dive level
+                        float diveT = SCurve(stateTimer / s2_tDive);
+                        SetNozzleWorldY(Mathf.Lerp(clearY, dive40Y, diveT));
+                        inFlightBottle.SetFill(0.40f);
+                    }
+                    else
+                    {
+                        // Sub-phase 2: Dispense completes 40% -> 100% while nozzle rises with liquid surface
+                        float fillProgress = Mathf.Clamp01((stateTimer - s2_tDive) / s2_tFill);
+                        float fillFrac = Mathf.Lerp(0.40f, 1.0f, SCurve(fillProgress));
+                        inFlightBottle.SetFill(fillFrac);
+                        SetNozzleWorldY(GetDiveFollowY(currentRecipe, fillFrac));
+                    }
                 }
                 break;
 
             case ChangeoverState.S3_CloseValveStopPump:
-                // Dwell while valve closes; nozzle remains down
+                // Valve closed & pump stopped. Nozzle retracts from full-fill dive height to recipe-clear height before S4 conveyor motion.
+                currentBeltSpeed = 0f;
+                float startRetractY = GetDiveFollowY(currentRecipe, 1.0f);
+                float endClearY = GetRecipeClearY(currentRecipe);
+                SetNozzleWorldY(Mathf.Lerp(startRetractY, endClearY, SCurve(StateProgress)));
                 break;
 
             case ChangeoverState.S4_ClearBottlesFromZone:
-                // Belt runs to clear bottles past downstream outfeed
+                // Belt runs to clear bottles past downstream outfeed; enforce nozzle at recipe-clear height
+                SetNozzleWorldY(GetRecipeClearY(currentRecipe));
                 break;
 
             case ChangeoverState.S5_StopBelt:
-                // S-curve belt deceleration
+                // S-curve belt deceleration; nozzle remains strictly at recipe-clear height
                 currentBeltSpeed = Mathf.Lerp(currentRecipe.beltSpeed, 0f, eased);
+                SetNozzleWorldY(GetRecipeClearY(currentRecipe));
                 break;
 
             case ChangeoverState.S6_RetractNozzleToHome:
                 // S6: DRIVE Z AXIS TO HOME HEIGHT FIRST. Rails remain strictly stationary.
-                float startY = BeltSurfaceY + currentRecipe.nozzleClearHeight;
+                float startY = GetRecipeClearY(currentRecipe);
                 float targetY = NozzleHomeY;
                 float curNozzleY = Mathf.Lerp(startY, targetY, eased);
                 SetNozzleWorldY(curNozzleY);
@@ -566,7 +606,7 @@ public class ChangeoverSequencer : MonoBehaviour
         if (firstArticleBottle == null) return;
 
         float t = stateTimer;
-        float targetFillY = BeltSurfaceY + targetRecipe.nozzleClearHeight;
+        float diveStartY = GetDiveStartY(targetRecipe);
 
         // Sub-phase 1: Physical continuous conveyor travel to station at target belt speed
         if (t < s9_tTravel)
@@ -574,32 +614,36 @@ public class ChangeoverSequencer : MonoBehaviour
             currentBeltSpeed = targetRecipe.beltSpeed;
             SetNozzleWorldY(NozzleHomeY);
         }
-        // Sub-phase 2: Conveyor stops, nozzle lowers from Home to recipe fill height via S-curve
+        // Sub-phase 2: Conveyor stops, nozzle lowers from Home to near bottle bottom via S-curve servo profile
         else if (t < s9_tTravel + s9_tLower)
         {
             currentBeltSpeed = 0f;
             firstArticleBottle.transform.position = new Vector3(0f, BeltSurfaceY, FillStationZ);
+            firstArticleBottle.SetFill(0f);
             float phaseT = (t - s9_tTravel) / s9_tLower;
-            SetNozzleWorldY(Mathf.Lerp(NozzleHomeY, targetFillY, SCurve(phaseT)));
+            SetNozzleWorldY(Mathf.Lerp(NozzleHomeY, diveStartY, SCurve(phaseT)));
         }
-        // Sub-phase 3: Dispense liquid into test bottle (grows strictly from base)
+        // Sub-phase 3: Dispense liquid from base while nozzle rises with liquid via dive-follow profile
         else if (t < s9_tTravel + s9_tLower + s9_tFill)
         {
             currentBeltSpeed = 0f;
-            SetNozzleWorldY(targetFillY);
+            firstArticleBottle.transform.position = new Vector3(0f, BeltSurfaceY, FillStationZ);
             float phaseT = (t - (s9_tTravel + s9_tLower)) / s9_tFill;
-            firstArticleBottle.SetFill(phaseT);
+            float fillFrac = SCurve(phaseT);
+            firstArticleBottle.SetFill(fillFrac);
+            SetNozzleWorldY(GetDiveFollowY(targetRecipe, fillFrac));
         }
-        // Sub-phase 4: Nozzle retracts back to Home height via S-curve; mark test bottle permanently filled
+        // Sub-phase 4: Nozzle retracts back to Home height via S-curve; test bottle marked permanently filled
         else if (t < s9_tTravel + s9_tLower + s9_tFill + s9_tRaise)
         {
             currentBeltSpeed = 0f;
             firstArticleBottle.SetFill(1.0f);
             firstArticleBottle.isFilled = true;
             float phaseT = (t - (s9_tTravel + s9_tLower + s9_tFill)) / s9_tRaise;
-            SetNozzleWorldY(Mathf.Lerp(targetFillY, NozzleHomeY, SCurve(phaseT)));
+            float fullFillDiveY = GetDiveFollowY(targetRecipe, 1.0f);
+            SetNozzleWorldY(Mathf.Lerp(fullFillDiveY, NozzleHomeY, SCurve(phaseT)));
         }
-        // Sub-phase 5: Conveyor restarts, verified first article bottle conveys downstream
+        // Sub-phase 5: Conveyor restarts only after nozzle reaches home; verified first article conveys downstream
         else
         {
             SetNozzleWorldY(NozzleHomeY);
@@ -689,7 +733,7 @@ public class ChangeoverSequencer : MonoBehaviour
 
         // Reset hardware geometry to initial recipe
         SetRailGap(currentRecipe.railGap);
-        SetNozzleWorldY(BeltSurfaceY + currentRecipe.nozzleClearHeight);
+        SetNozzleWorldY(GetRecipeClearY(currentRecipe));
         currentBeltSpeed = currentRecipe.beltSpeed;
 
         // Reactivate and reset the original bottle
@@ -826,6 +870,47 @@ public class ChangeoverSequencer : MonoBehaviour
 
         Vector3 p = nozzleAssembly.position;
         nozzleAssembly.position = new Vector3(p.x, y, p.z);
+    }
+
+    // =========================================================================
+    // DIVE-FILLING & ELEVATION HELPERS
+    // =========================================================================
+
+    /// <summary>
+    /// Recipe clearance height in world coordinates (safe clearance above bottle top).
+    /// Used for bottle transit through station (S4/S5) and baseline start for S6 gantry home retract.
+    /// </summary>
+    public float GetRecipeClearY(Recipe recipe)
+    {
+        return BeltSurfaceY + recipe.nozzleClearHeight;
+    }
+
+    /// <summary>
+    /// Dive start height in world coordinates near bottle bottom (25 mm above conveyor belt).
+    /// Ensures nozzle tip is safely inserted near bottom before dispensing starts.
+    /// </summary>
+    public float GetDiveStartY(Recipe recipe)
+    {
+        return BeltSurfaceY + DiveStartAboveBelt;
+    }
+
+    /// <summary>
+    /// Dive follow height in world coordinates: rises with liquid level during dispensing while
+    /// keeping nozzle tip approximately 10 mm submerged beneath liquid surface to prevent foaming,
+    /// clamped above dive-start height and strictly below bottle neck shoulder.
+    /// </summary>
+    public float GetDiveFollowY(Recipe recipe, float fillFraction)
+    {
+        float maxLiqH = recipe.bottleHeight * 0.70f;
+        float curLiqH = Mathf.Clamp01(fillFraction) * maxLiqH;
+        float liquidSurfaceY = BeltSurfaceY + 0.002f + curLiqH;
+
+        float diveStartY = GetDiveStartY(recipe);
+        float neckBottomY = BeltSurfaceY + recipe.bottleHeight * 0.76f;
+
+        // Submerged 10 mm beneath surface, bounded between dive start and bottle neck shoulder
+        float targetY = liquidSurfaceY - SubmergedOffset;
+        return Mathf.Clamp(targetY, diveStartY, neckBottomY - 0.005f);
     }
 
     // =========================================================================
